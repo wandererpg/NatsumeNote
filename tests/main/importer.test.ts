@@ -345,6 +345,7 @@ describe('game-folder importer', () => {
       ensure: vi.fn().mockRejectedValue(new Error('offline')),
       getSummary: vi.fn(),
       refresh: vi.fn(),
+      selectCandidate: vi.fn(),
     } satisfies GameMetadataService;
     try {
       await mkdir(source, { recursive: true });

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { GameEditor } from '../../src/renderer/src/components/library/GameEditor';
 import type { Game, GameMetadataSummary } from '../../src/shared/types';
@@ -11,6 +11,8 @@ const game: Game = {
 };
 
 describe('GameEditor deletion', () => {
+  afterEach(() => cleanup());
+
   it('requires an explicit confirmation before deleting the music folder', async () => {
     const onDelete = vi.fn().mockResolvedValue(undefined);
     render(
@@ -92,5 +94,61 @@ describe('GameEditor deletion', () => {
     expect(screen.getByText('无结果')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '刷新网络资料' }));
     await waitFor(() => expect(onRefreshMetadata).toHaveBeenCalledTimes(1));
+  });
+
+  it('lets the user choose and confirm an ambiguous source candidate', async () => {
+    const candidates = [
+      {
+        externalId: 'v17', title: 'ATRI -My Dear Moments-', titleCn: 'ATRI', developer: 'Frontwing',
+        summary: '候选一', score: 8.5, rank: null, releaseDate: '2020-06-19', languages: ['ja'], platforms: ['win'],
+        tags: ['科幻'], sourceUrl: 'https://vndb.org/v17',
+      },
+      {
+        externalId: 'v18', title: 'ATRI Another Story', titleCn: null, developer: 'Studio B',
+        summary: '候选二', score: 7.1, rank: null, releaseDate: '2021-01-01', languages: ['ja'], platforms: ['win'],
+        tags: [], sourceUrl: 'https://vndb.org/v18',
+      },
+    ];
+    const ambiguous: GameMetadataSummary = {
+      gameId: game.id,
+      coverSource: null,
+      sources: [
+        {
+          source: 'vndb', status: 'ambiguous', queryName: 'ATRI', externalId: null, title: null, titleCn: null,
+          developer: null, summary: null, score: null, rank: null, candidates, fetchedAt: '2026-09-14T00:00:00.000Z', errorMessage: null,
+        },
+        {
+          source: 'bangumi', status: 'no_match', queryName: 'ATRI', externalId: null, title: null, titleCn: null,
+          developer: null, summary: null, score: null, rank: null, candidates: [], fetchedAt: '2026-09-14T00:00:00.000Z', errorMessage: null,
+        },
+      ],
+    };
+    const matched: GameMetadataSummary = {
+      ...ambiguous,
+      coverSource: 'vndb',
+      sources: [{ ...ambiguous.sources[0], ...candidates[0], status: 'matched', candidates }, ambiguous.sources[1]],
+    };
+    const onSelectMetadataCandidate = vi.fn().mockResolvedValue(matched);
+    render(
+      <GameEditor
+        game={game}
+        metadata={ambiguous}
+        onRefreshMetadata={vi.fn().mockResolvedValue(ambiguous)}
+        onSelectMetadataCandidate={onSelectMetadataCandidate}
+        onClose={vi.fn()}
+        onSelectImage={vi.fn().mockResolvedValue(null)}
+        onSave={vi.fn().mockResolvedValue(undefined)}
+      />,
+    );
+
+    expect(screen.getByText('请选择正确的 VNDB 条目')).toBeInTheDocument();
+    const confirm = screen.getByRole('button', { name: '确认 VNDB 匹配' });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(screen.getByRole('radio', { name: /ATRI -My Dear Moments-/ }));
+    expect(confirm).toBeEnabled();
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(onSelectMetadataCandidate).toHaveBeenCalledWith(game.id, 'vndb', 'v17'));
+    expect(await screen.findByText('已匹配')).toBeInTheDocument();
   });
 });

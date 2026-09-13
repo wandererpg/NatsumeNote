@@ -465,6 +465,9 @@ export function createDatabaseLibraryService(
       ? (gameId) => options.metadata!.ensure(gameId, { signal: new AbortController().signal })
       : undefined,
     refreshGameMetadata: options.metadata ? (gameId) => options.metadata!.refresh(gameId) : undefined,
+    selectGameMetadataCandidate: options.metadata
+      ? (gameId, source, externalId) => options.metadata!.selectCandidate(gameId, source, externalId)
+      : undefined,
     deleteGame: (gameId: string) => enqueueMutation(async () => {
       const existing = getGame(db, gameId);
       if (!existing) {

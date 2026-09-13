@@ -4,7 +4,8 @@ import path from 'node:path';
 
 import { getGame, setGameCover } from '../database/queries/games';
 import { getGameSource, getGameSources, upsertGameSource, type GameSourceInput, type GameSourceRow } from '../database/queries/game-sources';
-import type { CoverSource, GameMetadataSourceSummary, GameMetadataSummary, MetadataSource, MetadataStatus } from '../../shared/types';
+import { AppError } from '../../shared/errors';
+import type { CoverSource, GameMetadataCandidateSummary, GameMetadataSourceSummary, GameMetadataSummary, MetadataSource, MetadataStatus } from '../../shared/types';
 import { assertWithin, sanitizeDirectoryName } from '../../shared/paths';
 import { downloadCover, type CoverHttpClient } from './cover-download';
 
@@ -124,6 +125,7 @@ export function summarizeCandidate(
   matched: NormalizedMetadataCandidate | null,
   fetchedAt: string | null,
   errorMessage: string | null,
+  candidates: NormalizedMetadataCandidate[] = [],
 ): GameMetadataSourceSummary {
   return {
     source,
@@ -141,8 +143,26 @@ export function summarizeCandidate(
     platforms: matched?.platforms ?? [],
     tags: matched?.tags ?? [],
     sourceUrl: matched?.sourceUrl ?? null,
+    candidates: candidates.map(toCandidateSummary),
     fetchedAt,
     errorMessage,
+  };
+}
+
+function toCandidateSummary(candidate: NormalizedMetadataCandidate): GameMetadataCandidateSummary {
+  return {
+    externalId: candidate.externalId,
+    title: candidate.title,
+    titleCn: candidate.titleCn,
+    developer: candidate.developer,
+    summary: candidate.summary,
+    score: candidate.score,
+    rank: candidate.rank,
+    releaseDate: candidate.releaseDate,
+    languages: candidate.languages,
+    platforms: candidate.platforms,
+    tags: candidate.tags,
+    sourceUrl: candidate.sourceUrl,
   };
 }
 
@@ -437,7 +457,7 @@ function emptySummary(source: MetadataSource, queryName: string): GameMetadataSo
 
 function toSummary(row: GameSourceRow, queryName: string): GameMetadataSourceSummary {
   const data = parseSourceData(row);
-  return summarizeCandidate(row.source, row.queryName || queryName, row.status === 'matched' ? 'matched' : row.status, data.matched, row.fetchedAt, row.errorMessage);
+  return summarizeCandidate(row.source, row.queryName || queryName, row.status === 'matched' ? 'matched' : row.status, data.matched, row.fetchedAt, row.errorMessage, data.candidates);
 }
 
 function nowIso(now: () => Date): string {
@@ -482,6 +502,7 @@ export interface GameMetadataService {
   ensure(gameId: string, options: { signal: AbortSignal; force?: boolean; onProgress?: (progress: MetadataProgress) => void }): Promise<GameMetadataSummary>;
   getSummary(gameId: string): GameMetadataSummary;
   refresh(gameId: string, signal?: AbortSignal): Promise<GameMetadataSummary>;
+  selectCandidate(gameId: string, source: MetadataSource, externalId: string, signal?: AbortSignal): Promise<GameMetadataSummary>;
 }
 
 export interface GameMetadataServiceOptions {
@@ -620,9 +641,53 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
     return getSummary(gameId);
   };
 
+  const selectCandidate = async (
+    gameId: string,
+    source: MetadataSource,
+    externalId: string,
+    signal = new AbortController().signal,
+  ): Promise<GameMetadataSummary> => {
+    const game = getGame(options.db, gameId);
+    if (!game) throw new AppError('FILE_NOT_FOUND', `Game not found: ${gameId}`, '找不到指定的游戏。');
+    const row = getGameSource(options.db, gameId, source);
+    const stored = row ? parseSourceData(row) : { matched: null, candidates: [] };
+    const selected = stored.candidates.find((candidate) => candidate.externalId === externalId);
+    if (!row || !selected) {
+      throw new AppError('FILE_NOT_FOUND', `Metadata candidate not found: ${source}/${externalId}`, '候选资料已失效，请重新搜索。');
+    }
+
+    const resolution: CandidateResolution = { status: 'matched', matched: selected, candidates: stored.candidates };
+    const selectedRow = sourceInput(gameId, source, row.queryName || game.name, resolution, row.fetchedAt ?? nowIso(now));
+    upsertGameSource(options.db, selectedRow);
+
+    if (selected.imageUrl && game.coverSource !== 'manual') {
+      const libraryPathValue = await options.getLibraryPath();
+      if (!libraryPathValue.trim()) throw new AppError('DB_ERROR', 'Library path is not configured', '请先设置音乐库目录。');
+      const libraryPath = path.resolve(libraryPathValue);
+      const targetDirectory = assertWithin(
+        game.folderPath && game.folderPath.trim() ? game.folderPath : path.join(libraryPath, sanitizeDirectoryName(game.name)),
+        libraryPath,
+      );
+      try {
+        const localPath = await download(selected.imageUrl, targetDirectory, signal, http);
+        const previousCover = game.coverPath;
+        setGameCover(options.db, gameId, localPath, source);
+        if (previousCover && isAutomaticCover(game.coverSource) && previousCover !== localPath && assertWithin(previousCover, libraryPath)) {
+          await rm(previousCover, { force: true }).catch(() => undefined);
+        }
+      } catch (error) {
+        if (isAbortError(error, signal)) throw error;
+        upsertGameSource(options.db, { ...selectedRow, errorMessage: error instanceof Error ? error.message : String(error) });
+      }
+    }
+
+    return getSummary(gameId);
+  };
+
   return {
     ensure,
     getSummary,
     refresh: (gameId, signal = new AbortController().signal) => ensure(gameId, { signal, force: true }),
+    selectCandidate,
   };
 }

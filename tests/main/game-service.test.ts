@@ -134,6 +134,7 @@ describe('database library service', () => {
       getSummary: vi.fn().mockReturnValue(pending),
       ensure: vi.fn().mockResolvedValue(complete),
       refresh: vi.fn().mockResolvedValue(complete),
+      selectCandidate: vi.fn().mockResolvedValue(complete),
     };
     const service = createDatabaseLibraryService(db, { metadata });
 

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { migrate } from '../../src/main/database/migrations';
 import { createGame, setGameCover } from '../../src/main/database/queries/games';
+import { upsertGameSource } from '../../src/main/database/queries/game-sources';
 import {
   createGameMetadataService,
   normalizeGameName,
@@ -286,6 +287,48 @@ describe('metadata migration fixture', () => {
       await service.ensure('g1', { signal: new AbortController().signal });
       await service.ensure('g1', { signal: new AbortController().signal });
       expect(http.calls.filter((url) => url.includes('/kana/vn') || url.includes('/search/subjects'))).toHaveLength(2);
+    } finally {
+      db.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('returns ambiguous candidates and persists the user-selected match', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'natsume-metadata-select-'));
+    const library = path.join(root, 'library');
+    const gameDirectory = path.join(library, 'ATRI');
+    const db = new Database(':memory:');
+    migrate(db);
+    createGame(db, { id: 'g1', name: 'ATRI' });
+    await mkdir(gameDirectory, { recursive: true });
+    const selected = candidate({ externalId: 'v-selected', title: 'ATRI', developer: 'Frontwing', imageUrl: 'https://img.example/selected.jpg' });
+    const other = candidate({ externalId: 'v-other', title: 'ATRI', developer: 'Other', imageUrl: 'https://img.example/other.jpg' });
+    upsertGameSource(db, {
+      gameId: 'g1', source: 'vndb', externalId: null, queryName: 'ATRI', status: 'ambiguous',
+      dataJson: JSON.stringify({ matched: null, candidates: [selected, other] }), imageUrl: null,
+      fetchedAt: '2026-09-14T00:00:00.000Z', retryAfter: null, errorMessage: null,
+    });
+    const downloaded: string[] = [];
+    const service = createGameMetadataService({
+      db,
+      getLibraryPath: () => library,
+      download: async (url) => {
+        downloaded.push(url);
+        const target = path.join(gameDirectory, '.cover.jpg');
+        await writeFile(target, 'cover');
+        return target;
+      },
+    });
+    try {
+      const before = service.getSummary('g1');
+      expect(before.sources[0].candidates).toHaveLength(2);
+
+      const after = await service.selectCandidate('g1', 'vndb', 'v-selected');
+
+      expect(after.sources[0]).toMatchObject({ status: 'matched', externalId: 'v-selected', developer: 'Frontwing' });
+      expect(after.sources[0].candidates).toHaveLength(2);
+      expect(after.coverSource).toBe('vndb');
+      expect(downloaded).toEqual(['https://img.example/selected.jpg']);
     } finally {
       db.close();
       await rm(root, { recursive: true, force: true });

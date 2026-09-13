@@ -21,6 +21,7 @@ import {
   IPC_LIBRARY_GET_GAME_METADATA,
   IPC_LIBRARY_GET_TRACKS,
   IPC_LIBRARY_REFRESH_GAME_METADATA,
+  IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE,
   IPC_LIBRARY_REMOVE_TRACK_FROM_PLAYLIST,
   IPC_LIBRARY_SEARCH,
   IPC_LIBRARY_UPDATE_GAME,
@@ -42,6 +43,7 @@ import type {
   JournalPage,
   JournalPageCreate,
   JournalPageDraft,
+  MetadataSource,
   Playlist,
   Track,
   TrackQuery,
@@ -78,6 +80,7 @@ export interface LibraryService {
   updateGame?(gameId: string, changes: GameUpdate): Promise<Game> | Game;
   getGameMetadata?(gameId: string): Promise<GameMetadataSummary> | GameMetadataSummary;
   refreshGameMetadata?(gameId: string): Promise<GameMetadataSummary> | GameMetadataSummary;
+  selectGameMetadataCandidate?(gameId: string, source: MetadataSource, externalId: string): Promise<GameMetadataSummary> | GameMetadataSummary;
   deleteGame?(gameId: string): Promise<void> | void;
   bulkUpdateTracks?(request: BulkTrackRequest): Promise<BulkTrackResult> | BulkTrackResult;
   listJournalAssets?(gameId: string): Promise<JournalAsset[]> | JournalAsset[];
@@ -112,6 +115,17 @@ function serviceMethod<T extends keyof LibraryService>(library: LibraryService, 
 
 function validateGameId(value: unknown): string {
   assertString(value, 'gameId');
+  return value;
+}
+
+function validateMetadataSource(value: unknown): MetadataSource {
+  if (value !== 'vndb' && value !== 'bangumi') throw invalidArgument('source must be vndb or bangumi');
+  return value;
+}
+
+function validateMetadataExternalId(value: unknown): string {
+  assertString(value, 'externalId');
+  if (value.length > 128 || !/^[a-z0-9._:-]+$/iu.test(value)) throw invalidArgument('externalId has an invalid format');
   return value;
 }
 
@@ -357,6 +371,15 @@ export function registerLibraryHandlers({ ipcMain, library, appearanceAuthorizat
   ipcMain.handle(IPC_LIBRARY_REFRESH_GAME_METADATA, async (_event, ...args) => {
     assertArgumentCount(args, 1, IPC_LIBRARY_REFRESH_GAME_METADATA);
     return await serviceMethod(library, 'refreshGameMetadata')(validateGameId(args[0]));
+  });
+
+  ipcMain.handle(IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE, async (_event, ...args) => {
+    assertArgumentCount(args, 3, IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE);
+    return await serviceMethod(library, 'selectGameMetadataCandidate')(
+      validateGameId(args[0]),
+      validateMetadataSource(args[1]),
+      validateMetadataExternalId(args[2]),
+    );
   });
 
   ipcMain.handle(IPC_LIBRARY_DELETE_GAME, async (_event, ...args) => {

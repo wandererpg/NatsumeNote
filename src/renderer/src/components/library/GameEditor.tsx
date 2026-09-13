@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import type { Game, GameMetadataSourceSummary, GameMetadataSummary, GameUpdate, MetadataSource, MetadataStatus } from '../../../../shared/types';
 import { toCoverUrl } from '../../../../shared/cover-url';
+import { MetadataCandidatePicker } from './MetadataCandidatePicker';
 
 export interface GameEditorProps {
   game: Game;
@@ -11,6 +12,7 @@ export interface GameEditorProps {
   onSave: (changes: GameUpdate) => Promise<void>;
   metadata?: GameMetadataSummary | null;
   onRefreshMetadata?: () => Promise<GameMetadataSummary | null>;
+  onSelectMetadataCandidate?: (gameId: string, source: MetadataSource, externalId: string) => Promise<GameMetadataSummary | null>;
   onDelete?: () => Promise<void>;
 }
 
@@ -49,7 +51,7 @@ function coverStatusLabel(metadata: GameMetadataSummary): string {
   return '未添加（没有可用资料）';
 }
 
-export function GameEditor({ game, onClose, onSelectImage, onSave, metadata, onRefreshMetadata, onDelete }: GameEditorProps) {
+export function GameEditor({ game, onClose, onSelectImage, onSave, metadata, onRefreshMetadata, onSelectMetadataCandidate, onDelete }: GameEditorProps) {
   const [name, setName] = useState(game.name);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [clearCover, setClearCover] = useState(false);
@@ -59,9 +61,14 @@ export function GameEditor({ game, onClose, onSelectImage, onSave, metadata, onR
   const [isDeleting, setIsDeleting] = useState(false);
   const [metadataState, setMetadataState] = useState<GameMetadataSummary | null>(metadata ?? null);
   const [isRefreshingMetadata, setIsRefreshingMetadata] = useState(false);
+  const [candidateSelection, setCandidateSelection] = useState<Partial<Record<MetadataSource, string>>>({});
+  const [selectingSource, setSelectingSource] = useState<MetadataSource | null>(null);
 
   useEffect(() => {
     setMetadataState(metadata ?? null);
+    setCandidateSelection(Object.fromEntries(
+      (metadata?.sources ?? []).filter((source) => source.externalId).map((source) => [source.source, source.externalId]),
+    ));
   }, [metadata]);
 
   const chooseImage = async () => {
@@ -121,6 +128,21 @@ export function GameEditor({ game, onClose, onSelectImage, onSave, metadata, onR
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : String(deleteError));
       setIsDeleting(false);
+    }
+  };
+
+  const confirmMetadataCandidate = async (source: MetadataSource) => {
+    const externalId = candidateSelection[source];
+    if (!externalId || !onSelectMetadataCandidate) return;
+    setSelectingSource(source);
+    setError(null);
+    try {
+      const selected = await onSelectMetadataCandidate(game.id, source, externalId);
+      if (selected) setMetadataState(selected);
+    } catch (selectionError) {
+      setError(selectionError instanceof Error ? selectionError.message : String(selectionError));
+    } finally {
+      setSelectingSource(null);
     }
   };
 
@@ -191,10 +213,19 @@ export function GameEditor({ game, onClose, onSelectImage, onSave, metadata, onR
                       </div>
                     ) : source.errorMessage ? (
                       <p className="game-editor__metadata-empty">{source.errorMessage}</p>
-                    ) : (
-                      <p className="game-editor__metadata-empty">{source.status === 'pending' ? '尚未查询' : source.status === 'ambiguous' ? '存在多个候选，请刷新或手动确认封面。' : source.status === 'no_match' ? '没有找到对应的游戏条目。' : '暂时无法获取资料，可稍后重试。'}</p>
-                    )}
-                  </article>
+                  ) : (
+                    <p className="game-editor__metadata-empty">{source.status === 'pending' ? '尚未查询' : source.status === 'ambiguous' ? '存在多个候选，请刷新或手动确认封面。' : source.status === 'no_match' ? '没有找到对应的游戏条目。' : '暂时无法获取资料，可稍后重试。'}</p>
+                  )}
+                  {onSelectMetadataCandidate && (
+                    <MetadataCandidatePicker
+                      source={source}
+                      selectedId={candidateSelection[source.source] ?? null}
+                      busy={selectingSource === source.source}
+                      onSelectionChange={(externalId) => setCandidateSelection((current) => ({ ...current, [source.source]: externalId }))}
+                      onConfirm={() => { void confirmMetadataCandidate(source.source); }}
+                    />
+                  )}
+                </article>
                 ))}
                 {!metadataState && <p className="game-editor__metadata-empty">正在读取本地资料缓存…</p>}
               </div>

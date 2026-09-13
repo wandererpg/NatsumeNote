@@ -35,6 +35,22 @@ export type MetadataSource = 'vndb' | 'bangumi';
 export type MetadataStatus = 'pending' | 'matched' | 'no_match' | 'failed' | 'ambiguous';
 export type CoverSource = 'manual' | MetadataSource | null;
 
+/** One sanitized search result that the user may confirm for a metadata source. */
+export interface GameMetadataCandidateSummary {
+  externalId: string;
+  title: string;
+  titleCn: string | null;
+  developer: string | null;
+  summary: string | null;
+  score: number | null;
+  rank: number | null;
+  releaseDate: string | null;
+  languages: string[];
+  platforms: string[];
+  tags: string[];
+  sourceUrl: string;
+}
+
 /** Sanitized source summary safe to send to the renderer. */
 export interface GameMetadataSourceSummary {
   source: MetadataSource;
@@ -52,6 +68,8 @@ export interface GameMetadataSourceSummary {
   platforms?: string[];
   tags?: string[];
   sourceUrl?: string | null;
+  /** Ranked, sanitized candidates retained for explicit user confirmation. */
+  candidates?: GameMetadataCandidateSummary[];
   fetchedAt: string | null;
   errorMessage: string | null;
 }

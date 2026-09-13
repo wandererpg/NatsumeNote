@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ArrowLeft, BookOpen, Disc3, FolderOpen, Info, Music2, Pencil } from 'lucide-react';
 
-import type { AppSettings, BulkTrackOperation, Game, GameMetadataSummary, GameUpdate, ScanResult, Track, TrackKind } from '../../shared/types';
+import type { AppSettings, BulkTrackOperation, Game, GameMetadataSummary, GameUpdate, MetadataSource, ScanResult, Track, TrackKind } from '../../shared/types';
 import { TrackTable } from './components/library/TrackTable';
 import { GameEditor } from './components/library/GameEditor';
 import { PlaylistPicker } from './components/library/PlaylistPicker';
@@ -336,6 +336,21 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
     return refreshed;
   };
 
+  const selectEditingGameMetadataCandidate = async (
+    gameId: string,
+    source: MetadataSource,
+    externalId: string,
+  ): Promise<GameMetadataSummary | null> => {
+    const api = getGalMusicApi();
+    if (!api?.selectGameMetadataCandidate) throw new Error('当前程序版本不支持候选确认，请重启应用后再试。');
+    const selected = await api.selectGameMetadataCandidate(gameId, source, externalId);
+    setEditingGameMetadata(selected);
+    if (selectedGameId === gameId) setSelectedGameMetadata(selected);
+    const refreshedGames = await loadGames();
+    setEditingGame((current) => current?.id === gameId ? refreshedGames.find((game) => game.id === gameId) ?? current : current);
+    return selected;
+  };
+
   const saveSettings = async (changes: SettingsChanges) => {
     const api = getGalMusicApi();
     if (api?.saveSettings) await api.saveSettings(changes);
@@ -539,6 +554,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
           game={editingGame}
           metadata={editingGameMetadata}
           onRefreshMetadata={refreshEditingGameMetadata}
+          onSelectMetadataCandidate={selectEditingGameMetadataCandidate}
           onClose={() => { metadataRequestRef.current += 1; setCurrentModal(null); setEditingGame(null); setEditingGameMetadata(null); }}
           onSelectImage={() => getGalMusicApi()?.selectImage?.() ?? Promise.resolve(null)}
           onSave={async (changes: GameUpdate) => {
