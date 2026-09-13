@@ -1,9 +1,11 @@
-import { Menu, Minus, Search, Settings2, Square, X } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, Search, Settings2, Square, X } from 'lucide-react';
 
 export interface TitleBarProps {
   searchText?: string;
   onSearchChange?: (value: string) => void;
-  onMenuClick?: () => void;
+  showBack?: boolean;
+  onBack?: () => void;
+  onImport?: () => void;
   onSettingsClick?: () => void;
   onMinimize?: () => void;
   onToggleMaximize?: () => void;
@@ -11,13 +13,14 @@ export interface TitleBarProps {
 }
 
 const copy = {
-  menu: '\u83dc\u5355',
+  back: '返回游戏仓库',
+  import: '导入游戏',
   settings: '\u8bbe\u7f6e',
   minimize: '\u6700\u5c0f\u5316',
   maximize: '\u6700\u5927\u5316',
   close: '\u5173\u95ed',
-  searchLabel: '\u641c\u7d22\u66f2\u76ee\u3001\u6e38\u620f\u6216\u6587\u4ef6\u540d',
-  searchPlaceholder: '\u641c\u7d22\u66f2\u76ee\u3001\u6e38\u620f\u6216\u6587\u4ef6\u540d',
+  searchLabel: '搜索作品或曲目',
+  searchPlaceholder: '搜索作品或曲目',
 };
 
 function windowAction(name: 'minimizeWindow' | 'toggleMaximizeWindow' | 'closeWindow'): void {
@@ -30,7 +33,9 @@ function windowAction(name: 'minimizeWindow' | 'toggleMaximizeWindow' | 'closeWi
 export function TitleBar({
   searchText = '',
   onSearchChange,
-  onMenuClick,
+  showBack = false,
+  onBack,
+  onImport,
   onSettingsClick,
   onMinimize,
   onToggleMaximize,
@@ -39,9 +44,7 @@ export function TitleBar({
   return (
     <header className="title-bar" data-testid="title-bar">
       <div className="title-bar__leading">
-        <button className="icon-button title-bar__menu" type="button" aria-label={copy.menu} title={copy.menu} onClick={onMenuClick}>
-          <Menu size={18} strokeWidth={1.8} aria-hidden="true" />
-        </button>
+        {showBack && <button className="icon-button title-bar__back" type="button" aria-label={copy.back} title={copy.back} onClick={onBack}><ArrowLeft size={18} strokeWidth={1.8} aria-hidden="true" /></button>}
         <div className="brand-mark" aria-hidden="true">
           <span className="brand-mark__ring" />
           <span className="brand-mark__dot" />
@@ -66,6 +69,7 @@ export function TitleBar({
       </label>
 
       <div className="title-bar__actions">
+        {onImport && <button className="title-bar__import" type="button" onClick={onImport}><Plus size={15} aria-hidden="true" />{copy.import}</button>}
         <button className="icon-button" type="button" aria-label={copy.settings} title={copy.settings} onClick={onSettingsClick}>
           <Settings2 size={17} strokeWidth={1.8} aria-hidden="true" />
         </button>

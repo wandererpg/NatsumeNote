@@ -94,18 +94,39 @@ describe('renderer shell', () => {
     expect(screen.queryByText('GalMusic')).not.toBeInTheDocument();
   });
 
-  it('renders the game list and track rows when data exists', async () => {
+  it('opens with a poster game shelf and enters one game before showing its music', async () => {
     mockGalMusic([game], [track]);
     render(<App />);
 
     expect(await screen.findByTestId('game-list')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '游戏仓库' })).toBeInTheDocument();
+    expect(screen.queryByTestId(`track-row-${track.id}`)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(`game-item-${game.id}`));
+    expect(await screen.findByRole('heading', { name: game.name, level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开作品资料' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(screen.getByRole('button', { name: '打开音乐空间' }));
     expect(await screen.findByTestId(`track-row-${track.id}`)).toBeInTheDocument();
     expect(screen.getByText(track.displayName)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '打开手账空间' }));
+    expect(await screen.findByRole('region', { name: '作品手账' })).toBeInTheDocument();
+  });
+
+  it('filters the poster shelf by game name', async () => {
+    mockGalMusic([game], [track]);
+    render(<App />);
+
+    await screen.findByTestId(`game-item-${game.id}`);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '不存在的作品' } });
+    expect(await screen.findByText('没有找到对应作品')).toBeInTheDocument();
+    expect(screen.queryByTestId(`game-item-${game.id}`)).not.toBeInTheDocument();
   });
 
   it('keeps track column headers while removing helper copy from the library shell', async () => {
     mockGalMusic([game], [track]);
     render(<App />);
+
+    fireEvent.click(await screen.findByTestId(`game-item-${game.id}`));
+    fireEvent.click(screen.getByRole('button', { name: '打开音乐空间' }));
 
     expect(await screen.findByRole('columnheader', { name: '曲目' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '格式' })).toBeInTheDocument();
@@ -130,6 +151,8 @@ describe('renderer shell', () => {
     render(<App />);
 
     const mainContent = await screen.findByTestId('main-content');
+    fireEvent.click(screen.getByTestId(`game-item-${game.id}`));
+    fireEvent.click(screen.getByRole('button', { name: '打开音乐空间' }));
     const table = await screen.findByTestId('track-table');
     expect(mainContent).toContainElement(table);
     expect(mainContent).toHaveAttribute('data-scroll-surface', 'library');
@@ -140,33 +163,28 @@ describe('renderer shell', () => {
     const playTrack = vi.fn();
     render(<App onPlayTrack={playTrack} />);
 
+    fireEvent.click(await screen.findByTestId(`game-item-${game.id}`));
+    fireEvent.click(screen.getByRole('button', { name: '打开音乐空间' }));
     const row = await screen.findByTestId(`track-row-${track.id}`);
     fireEvent.doubleClick(row);
 
     await waitFor(() => expect(playTrack).toHaveBeenCalledWith(track));
   });
 
-  it('loads each sidebar collection with its own query instead of reusing the selected game', async () => {
+  it('returns from a game detail to the poster shelf', async () => {
     mockGalMusic([game], [track]);
     render(<App />);
 
-    const api = window.galMusic;
-    await screen.findByTestId('game-list');
-    fireEvent.click(screen.getByTestId('sidebar-nav-recent'));
-
-    await waitFor(() => expect(api.getTracks).toHaveBeenLastCalledWith({
-      section: 'recent',
-      gameId: null,
-      playlistId: null,
-      search: '',
-      kind: null,
-    }));
+    fireEvent.click(await screen.findByTestId(`game-item-${game.id}`));
+    fireEvent.click(screen.getAllByRole('button', { name: '返回游戏仓库' })[0]);
+    expect(await screen.findByRole('heading', { name: '游戏仓库' })).toBeInTheDocument();
   });
 
   it('filters a selected game by music or voice without changing other collections', async () => {
     mockGalMusic([game], [track]);
     render(<App />);
     fireEvent.click(await screen.findByTestId(`game-item-${game.id}`));
+    fireEvent.click(screen.getByRole('button', { name: '打开音乐空间' }));
 
     expect(await screen.findByRole('button', { name: '全部' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: '语音' }));
@@ -183,6 +201,8 @@ describe('renderer shell', () => {
     mockGalMusic([game], [track]);
     render(<App />);
 
+    fireEvent.click(await screen.findByTestId(`game-item-${game.id}`));
+    fireEvent.click(screen.getByRole('button', { name: '打开音乐空间' }));
     const row = await screen.findByTestId(`track-row-${track.id}`);
     fireEvent.click(screen.getByTestId(`favorite-track-${track.id}`));
 
@@ -204,7 +224,7 @@ describe('renderer shell', () => {
     mockGalMusic([game], [track]);
     render(<App playerState={{ currentTrack: track, progress: 0.004, duration: 100, currentTime: 0.4 }} />);
 
-    await screen.findByTestId(`track-row-${track.id}`);
+    await screen.findByTestId('game-list');
     expect(screen.getByTestId('player-progress-fill')).toHaveStyle({ width: '0.4%' });
   });
 });

@@ -61,6 +61,7 @@ function installApi(result: BulkTrackResult = { succeededIds: ['track-1', 'track
 async function openSourceGame() {
   render(<App />);
   fireEvent.click(await screen.findByTestId('game-item-game-1'));
+    fireEvent.click(screen.getByRole('button', { name: '打开音乐空间' }));
   await screen.findByRole('checkbox', { name: '选择 Track 1' });
 }
 
@@ -83,10 +84,11 @@ describe('bulk track operations', () => {
   it('enables selection only in a concrete game and sends favorite changes in one request', async () => {
     const api = installApi();
     render(<App />);
-    await screen.findByTestId('track-row-track-1');
+    await screen.findByTestId('game-list');
     expect(screen.queryByRole('checkbox', { name: '选择 Track 1' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('game-item-game-1'));
+    fireEvent.click(screen.getByRole('button', { name: '打开音乐空间' }));
     await screen.findByRole('checkbox', { name: '选择 Track 1' });
     selectFirstTwo();
     fireEvent.click(screen.getByRole('button', { name: '收藏所选曲目' }));
@@ -200,11 +202,13 @@ describe('bulk track operations', () => {
     await waitFor(() => expect(screen.queryByText('已选择 1 首')).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('checkbox', { name: '选择 Track 1' }));
-    fireEvent.click(screen.getByTestId('game-item-game-2'));
+    fireEvent.click(screen.getAllByRole('button', { name: '返回游戏仓库' })[0]);
+    fireEvent.click(await screen.findByTestId('game-item-game-2'));
+    fireEvent.click(screen.getByRole('button', { name: '打开音乐空间' }));
     await waitFor(() => expect(screen.queryByText('已选择 1 首')).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('checkbox', { name: '选择 Track 1' }));
-    fireEvent.click(screen.getByTestId('sidebar-nav-recent'));
+    fireEvent.click(screen.getAllByRole('button', { name: '返回游戏仓库' })[0]);
     await waitFor(() => expect(screen.queryByText('已选择 1 首')).not.toBeInTheDocument());
   });
 

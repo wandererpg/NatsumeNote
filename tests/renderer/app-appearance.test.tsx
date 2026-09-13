@@ -84,7 +84,7 @@ describe('app appearance integration', () => {
     } as unknown as typeof window.galMusic;
 
     render(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '从文件夹导入' }));
+    fireEvent.click(await screen.findByRole('button', { name: '导入游戏' }));
     await waitFor(() => expect(receiveScanResult).toEqual(expect.any(Function)));
 
     await act(async () => {
