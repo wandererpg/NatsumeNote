@@ -13,7 +13,7 @@ const WINDOWS_INVALID_DIRECTORY_CHARACTERS = /[<>:"\/\\|?*\u0000-\u001f]/g;
  * filesystem operations should still pass the value through `path` helpers.
  */
 export const defaultLibraryPath = (userDataRoot: string): string => {
-  const normalized = path.normalize(path.join(userDataRoot, 'Music', 'NatsumeMusic'));
+  const normalized = path.normalize(path.join(userDataRoot, 'Music', 'NatsumeNote'));
   return normalized.replaceAll('\\', '/');
 };
 

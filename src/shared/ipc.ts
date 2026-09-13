@@ -7,6 +7,11 @@ import type {
   Game,
   GameMetadataSummary,
   GameUpdate,
+  JournalAsset,
+  JournalAssetKind,
+  JournalPage,
+  JournalPageCreate,
+  JournalPageDraft,
   PlayerErrorListener,
   PlayerState,
   PlayerStateListener,
@@ -45,9 +50,15 @@ export const LIBRARY_GET_GAME_METADATA = 'library:get-game-metadata' as const;
 export const LIBRARY_REFRESH_GAME_METADATA = 'library:refresh-game-metadata' as const;
 export const LIBRARY_DELETE_GAME = 'library:delete-game' as const;
 export const LIBRARY_BULK_UPDATE_TRACKS = 'library:bulk-update-tracks' as const;
+export const LIBRARY_GET_JOURNAL_PAGES = 'library:get-journal-pages' as const;
+export const LIBRARY_CREATE_JOURNAL_PAGE = 'library:create-journal-page' as const;
+export const LIBRARY_SAVE_JOURNAL_PAGE = 'library:save-journal-page' as const;
+export const LIBRARY_DELETE_JOURNAL_PAGE = 'library:delete-journal-page' as const;
+export const LIBRARY_GET_JOURNAL_ASSETS = 'library:get-journal-assets' as const;
 export const DIALOG_SELECT_FOLDER = 'dialog:select-folder' as const;
 export const DIALOG_SELECT_FILES = 'dialog:select-files' as const;
 export const DIALOG_SELECT_IMAGE = 'dialog:select-image' as const;
+export const JOURNAL_SELECT_MEDIA = 'journal:select-media' as const;
 export const SHELL_OPEN_EXPLORER = 'shell:open-explorer' as const;
 export const APP_GET_SETTINGS = 'app:get-settings' as const;
 export const APP_SET_SETTING = 'app:set-setting' as const;
@@ -84,9 +95,15 @@ export const IPC_REQUESTS = {
   libraryRefreshGameMetadata: LIBRARY_REFRESH_GAME_METADATA,
   libraryDeleteGame: LIBRARY_DELETE_GAME,
   libraryBulkUpdateTracks: LIBRARY_BULK_UPDATE_TRACKS,
+  libraryGetJournalPages: LIBRARY_GET_JOURNAL_PAGES,
+  libraryCreateJournalPage: LIBRARY_CREATE_JOURNAL_PAGE,
+  librarySaveJournalPage: LIBRARY_SAVE_JOURNAL_PAGE,
+  libraryDeleteJournalPage: LIBRARY_DELETE_JOURNAL_PAGE,
+  libraryGetJournalAssets: LIBRARY_GET_JOURNAL_ASSETS,
   dialogSelectFolder: DIALOG_SELECT_FOLDER,
   dialogSelectFiles: DIALOG_SELECT_FILES,
   dialogSelectImage: DIALOG_SELECT_IMAGE,
+  journalSelectMedia: JOURNAL_SELECT_MEDIA,
   shellOpenExplorer: SHELL_OPEN_EXPLORER,
   appGetSettings: APP_GET_SETTINGS,
   appSetSetting: APP_SET_SETTING,
@@ -135,9 +152,15 @@ export const IPC_LIBRARY_GET_GAME_METADATA = LIBRARY_GET_GAME_METADATA;
 export const IPC_LIBRARY_REFRESH_GAME_METADATA = LIBRARY_REFRESH_GAME_METADATA;
 export const IPC_LIBRARY_DELETE_GAME = LIBRARY_DELETE_GAME;
 export const IPC_LIBRARY_BULK_UPDATE_TRACKS = LIBRARY_BULK_UPDATE_TRACKS;
+export const IPC_LIBRARY_GET_JOURNAL_PAGES = LIBRARY_GET_JOURNAL_PAGES;
+export const IPC_LIBRARY_CREATE_JOURNAL_PAGE = LIBRARY_CREATE_JOURNAL_PAGE;
+export const IPC_LIBRARY_SAVE_JOURNAL_PAGE = LIBRARY_SAVE_JOURNAL_PAGE;
+export const IPC_LIBRARY_DELETE_JOURNAL_PAGE = LIBRARY_DELETE_JOURNAL_PAGE;
+export const IPC_LIBRARY_GET_JOURNAL_ASSETS = LIBRARY_GET_JOURNAL_ASSETS;
 export const IPC_DIALOG_SELECT_FOLDER = DIALOG_SELECT_FOLDER;
 export const IPC_DIALOG_SELECT_FILES = DIALOG_SELECT_FILES;
 export const IPC_DIALOG_SELECT_IMAGE = DIALOG_SELECT_IMAGE;
+export const IPC_JOURNAL_SELECT_MEDIA = JOURNAL_SELECT_MEDIA;
 export const IPC_SHELL_OPEN_EXPLORER = SHELL_OPEN_EXPLORER;
 export const IPC_APP_GET_SETTINGS = APP_GET_SETTINGS;
 export const IPC_APP_SET_SETTING = APP_SET_SETTING;
@@ -176,10 +199,16 @@ export interface GalMusicAPI {
   refreshGameMetadata?: (gameId: string) => Promise<GameMetadataSummary>;
   deleteGame?: (gameId: string) => Promise<void>;
   bulkUpdateTracks(request: BulkTrackRequest): Promise<BulkTrackResult>;
+  getJournalPages?: (gameId: string) => Promise<JournalPage[]>;
+  createJournalPage?: (input: JournalPageCreate) => Promise<JournalPage>;
+  saveJournalPage?: (draft: JournalPageDraft) => Promise<JournalPage>;
+  deleteJournalPage?: (pageId: string) => Promise<void>;
+  getJournalAssets?: (gameId: string) => Promise<JournalAsset[]>;
 
   selectFolder(): Promise<string | null>;
   selectFiles(): Promise<string[]>;
   selectImage(): Promise<string | null>;
+  selectJournalMedia?: (gameId: string, kind: JournalAssetKind) => Promise<JournalAsset[]>;
   openExplorer(targetPath: string): Promise<void>;
 
   getSettings(): Promise<AppSettings>;

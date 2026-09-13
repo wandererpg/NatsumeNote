@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ChevronRight, Disc3, FolderOpen, Import, LibraryBig } from 'lucide-react';
+import { AlertCircle, BookOpen, ChevronRight, Disc3, FolderOpen, Import, LibraryBig } from 'lucide-react';
 
 import type { AppSettings, BulkTrackOperation, Game, GameMetadataSummary, GameUpdate, LibrarySection, PlayMode, Playlist, ScanResult, Track, TrackKind } from '../../shared/types';
 import { toCoverUrl } from '../../shared/cover-url';
@@ -17,6 +17,7 @@ import { TitleBar } from './components/layout/TitleBar';
 import { ScanDialog } from './components/scanner/ScanDialog';
 import { SettingsPanel, type AppearanceDraft, type SettingsChanges } from './components/settings/SettingsPanel';
 import { Welcome } from './components/settings/Welcome';
+import { JournalWorkspace } from './features/journal/JournalWorkspace';
 import { EmptyState } from './components/ui/EmptyState';
 import { useLibraryStore } from './stores/libraryStore';
 import { usePlayerStore } from './stores/playerStore';
@@ -42,7 +43,7 @@ function getGalMusicApi() {
 }
 
 const defaultSettings: AppSettings = {
-  libraryPath: '%USERPROFILE%\\Music\\NatsumeMusic',
+  libraryPath: '%USERPROFILE%\\Music\\NatsumeNote',
   volume: 0.8,
   playMode: 'list-loop',
   lastTrackId: null,
@@ -73,6 +74,8 @@ interface BulkResultNotice {
   failures: Array<{ trackId: string; trackLabel: string; userMessage: string }>;
   warning?: string;
 }
+
+type GameViewMode = 'tracks' | 'journal';
 
 export default function App({ onPlayTrack, playTrack: playTrackProp, playerState, playerActions, onImport }: AppProps) {
   const games = useLibraryStore((state) => state.games);
@@ -120,6 +123,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
   const welcomeDismissedRef = useRef(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [trackKindFilter, setTrackKindFilter] = useState<TrackKind | null>(null);
+  const [gameViewMode, setGameViewMode] = useState<GameViewMode>('tracks');
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
   const [bulkDialog, setBulkDialog] = useState<'move' | 'playlist' | 'delete' | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -287,6 +291,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
 
   const selectSection = (section: LibrarySection) => {
     setActiveSection(section);
+    setGameViewMode('tracks');
     setSearchText('');
     if (section !== 'library') setSelectedGame(null);
     if (section !== 'playlists') setSelectedPlaylist(null);
@@ -294,6 +299,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
 
   const selectGame = (game: Game) => {
     setActiveSection('library');
+    setGameViewMode('tracks');
     setSelectedPlaylist(null);
     setSelectedGame(game.id);
     setSearchText('');
@@ -408,8 +414,19 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
     else storeSeek(nextTime);
   };
 
+  const handleSeekTo = (seconds: number) => {
+    const nextTime = Math.max(0, seconds);
+    if (playerActions?.onSeek) {
+      playerActions.onSeek(duration && duration > 0 ? (nextTime / duration) * 100 : 0);
+    } else {
+      storeSeek(nextTime);
+    }
+  };
+
   const headerTitle = activeSection === 'library' && selectedGame ? selectedGame.name : activeSection === 'playlists' && selectedPlaylist ? selectedPlaylist.name : copy.title;
-  const headerDescription = activeSection === 'library' && selectedGame ? `${tracks.length} 首曲目` : copy.description;
+  const headerDescription = activeSection === 'library' && selectedGame
+    ? gameViewMode === 'journal' ? '可编辑的作品记忆空间' : `${tracks.length} 首曲目`
+    : copy.description;
   const gameCountLabel = `${games.length} 个游戏`;
   const trackCountLabel = `${tracks.length} 首曲目`;
   const effectiveAppearance = appearancePreview ?? { themeId: settings.themeId, background: settings.background, fontColor: settings.fontColor ?? null };
@@ -486,6 +503,14 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
               </section>
 
               {activeSection === 'library' && selectedGame && (
+                <div className="game-view-switcher" role="group" aria-label="作品视图">
+                  <button type="button" className={gameViewMode === 'tracks' ? 'is-active' : ''} aria-pressed={gameViewMode === 'tracks'} onClick={() => setGameViewMode('tracks')}>曲目</button>
+                  <button type="button" className={gameViewMode === 'journal' ? 'is-active' : ''} aria-pressed={gameViewMode === 'journal'} onClick={() => setGameViewMode('journal')}><BookOpen size={14} />作品手账</button>
+                  <button type="button" onClick={() => { void openGameEditor(selectedGame); }}>作品资料</button>
+                </div>
+              )}
+
+              {activeSection === 'library' && selectedGame && gameViewMode === 'tracks' && (
                 <div className="track-kind-filter" role="group" aria-label="曲目分类">
                   {([
                     [null, '全部'],
@@ -520,7 +545,16 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
                 </div>
               )}
 
-              {isLoadingTracks ? (
+              {activeSection === 'library' && selectedGame && gameViewMode === 'journal' ? (
+                <JournalWorkspace
+                  game={selectedGame}
+                  tracks={tracks}
+                  currentTrack={currentTrack}
+                  currentTime={currentTime}
+                  onPlayTrack={playTrack}
+                  onSeekTo={handleSeekTo}
+                />
+              ) : isLoadingTracks ? (
                 <section className="loading-state loading-state--tracks" aria-live="polite"><span className="loading-state__spinner" />正在读取曲目…</section>
               ) : tracks.length === 0 ? (
                 <EmptyState

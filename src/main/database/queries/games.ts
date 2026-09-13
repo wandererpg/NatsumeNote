@@ -24,11 +24,24 @@ interface GameRow {
 function mapGame(row: GameRow | undefined): Game | undefined {
   if (!row) return undefined;
   const { firstTrackPath, ...game } = row;
+  const folderPath = firstTrackPath ? gameFolderFromTrack(firstTrackPath) : null;
   return {
     ...game,
     coverSource: game.coverSource ?? null,
-    folderPath: firstTrackPath ? path.dirname(firstTrackPath) : null,
+    folderPath,
   };
+}
+
+function gameFolderFromTrack(trackPath: string): string {
+  let directory = path.dirname(trackPath);
+  for (let index = 0; index < 8; index += 1) {
+    const directoryName = path.basename(directory).toLocaleLowerCase();
+    if (directoryName === '音乐' || directoryName === '语音') return path.dirname(directory);
+    const parent = path.dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  return path.dirname(trackPath);
 }
 
 const GAME_SELECT = `

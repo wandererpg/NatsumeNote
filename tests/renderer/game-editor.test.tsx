@@ -45,6 +45,11 @@ describe('GameEditor deletion', () => {
           summary: 'A locally cached summary.',
           score: 8.5,
           rank: 17,
+          releaseDate: '2020-06-19',
+          languages: ['ja', 'zh-Hans'],
+          platforms: ['win'],
+          tags: ['Science fiction', 'Android'],
+          sourceUrl: 'https://vndb.org/v17',
           fetchedAt: '2026-08-24T00:00:00.000Z',
           errorMessage: null,
         },
@@ -79,6 +84,10 @@ describe('GameEditor deletion', () => {
     expect(screen.getByText('网络资料')).toBeInTheDocument();
     expect(screen.getByText('封面：已添加（VNDB）')).toBeInTheDocument();
     expect(screen.getByText('开发商：Frontwing')).toBeInTheDocument();
+    expect(screen.getByText('发行日期：2020-06-19')).toBeInTheDocument();
+    expect(screen.getByText('平台：win')).toBeInTheDocument();
+    expect(screen.getByText('Science fiction')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '查看 VNDB 条目' })).toHaveAttribute('href', 'https://vndb.org/v17');
     expect(screen.getByText('已匹配')).toBeInTheDocument();
     expect(screen.getByText('无结果')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '刷新网络资料' }));

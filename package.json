@@ -1,10 +1,14 @@
 {
-  "name": "galmusic",
+  "name": "natsume-note",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <23"
+  },
   "main": "./out/main/index.js",
   "scripts": {
-    "rebuild:native": "electron-rebuild --force --which-module better-sqlite3 --version 31.7.7",
+    "rebuild:native": "node scripts/ensure-electron-native.mjs",
+    "rebuild:native:source": "electron-rebuild --force --which-module better-sqlite3",
     "postinstall": "npm run rebuild:native",
     "predev": "npm run rebuild:native",
     "dev": "electron-vite dev",

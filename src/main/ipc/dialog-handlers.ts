@@ -3,13 +3,16 @@ import {
   IPC_DIALOG_SELECT_FILES,
   IPC_DIALOG_SELECT_FOLDER,
   IPC_DIALOG_SELECT_IMAGE,
+  IPC_JOURNAL_SELECT_MEDIA,
   IPC_SHELL_OPEN_EXPLORER,
 } from '../../shared/ipc';
 import {
   assertArgumentCount,
   assertPath,
+  assertString,
 } from './validation';
 import type { IpcMainLike } from './library-handlers';
+import type { JournalAsset, JournalAssetKind } from '../../shared/types';
 
 export interface DialogLike {
   showOpenDialog(
@@ -28,6 +31,7 @@ export interface DialogHandlerDependencies {
   shell: ShellLike;
   getOwnerWindow?: (event: unknown) => unknown;
   onImageSelected?: (filePath: string) => void;
+  onJournalMediaSelected?: (gameId: string, kind: JournalAssetKind, filePaths: string[]) => Promise<JournalAsset[]> | JournalAsset[];
 }
 
 function ownerWindow(event: unknown, getOwnerWindow?: (event: unknown) => unknown): unknown {
@@ -44,6 +48,7 @@ export function registerDialogHandlers({
   shell,
   getOwnerWindow,
   onImageSelected,
+  onJournalMediaSelected,
 }: DialogHandlerDependencies): void {
   ipcMain.handle(IPC_DIALOG_SELECT_FOLDER, async (event, ...args) => {
     assertArgumentCount(args, 0, IPC_DIALOG_SELECT_FOLDER);
@@ -71,6 +76,27 @@ export function registerDialogHandlers({
     const selected = result.canceled ? null : result.filePaths[0] ?? null;
     if (selected) onImageSelected?.(selected);
     return selected;
+  });
+
+  ipcMain.handle(IPC_JOURNAL_SELECT_MEDIA, async (event, ...args) => {
+    assertArgumentCount(args, 2, IPC_JOURNAL_SELECT_MEDIA);
+    assertString(args[0], 'gameId');
+    if (args[1] !== 'image' && args[1] !== 'video') {
+      throw new AppError('DB_ERROR', `Invalid journal media kind: ${String(args[1])}`, '不支持这种手账素材。');
+    }
+    if (!onJournalMediaSelected) {
+      throw new AppError('DB_ERROR', 'Journal media importer is not configured', '手账素材导入暂不可用。');
+    }
+    const kind = args[1] as JournalAssetKind;
+    const filters = kind === 'image'
+      ? [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }]
+      : [{ name: 'Videos', extensions: ['mp4', 'webm', 'ogv', 'mov'] }];
+    const result = await dialog.showOpenDialog(ownerWindow(event, getOwnerWindow), {
+      properties: ['openFile', 'multiSelections'],
+      filters,
+    });
+    if (result.canceled || result.filePaths.length === 0) return [];
+    return await onJournalMediaSelected(args[0], kind, result.filePaths);
   });
 
   ipcMain.handle(IPC_SHELL_OPEN_EXPLORER, async (_event, ...args) => {

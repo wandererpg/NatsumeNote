@@ -10,7 +10,7 @@ export interface WelcomeProps {
 
 const copy = {
   title: '\u7ed9\u4f60\u7684\u6e38\u620f\u97f3\u4e50\u4e00\u4e2a\u5b89\u9759\u7684\u5bb6',
-  description: 'NatsumeMusic \u4f1a\u628a\u5bfc\u5165\u7684\u97f3\u9891\u590d\u5236\u5230\u72ec\u7acb\u97f3\u4e50\u5e93\u3002\u65ad\u5f00\u7f51\u7edc\u4e5f\u80fd\u64ad\u653e\uff0c\u6e90\u6587\u4ef6\u79fb\u52a8\u540e\u4e0d\u4f1a\u5f71\u54cd\u8fd9\u91cc\u7684\u526f\u672c\u3002',
+  description: 'NatsumeNote \u4f1a\u628a\u5bfc\u5165\u7684\u97f3\u9891\u590d\u5236\u5230\u72ec\u7acb\u97f3\u4e50\u5e93\u3002\u65ad\u5f00\u7f51\u7edc\u4e5f\u80fd\u64ad\u653e\uff0c\u6e90\u6587\u4ef6\u79fb\u52a8\u540e\u4e0d\u4f1a\u5f71\u54cd\u8fd9\u91cc\u7684\u526f\u672c\u3002',
   pathLabel: '\u97f3\u4e50\u5e93\u4f4d\u7f6e',
   choose: '\u9009\u62e9\u6587\u4ef6\u5939',
   import: '\u5bfc\u5165\u6e38\u620f\u97f3\u4e50',
@@ -22,7 +22,7 @@ function messageFor(error: unknown, fallback: string): string {
 }
 
 export function Welcome({
-  defaultPath = '%USERPROFILE%\\Music\\NatsumeMusic',
+  defaultPath = '%USERPROFILE%\\Music\\NatsumeNote',
   onSavePath,
   onSelectFolder,
   onImport,

@@ -27,6 +27,10 @@ function candidate(overrides: Partial<NormalizedMetadataCandidate> = {}): Normal
     summary: null,
     score: null,
     rank: null,
+    releaseDate: null,
+    languages: [],
+    platforms: [],
+    tags: [],
     imageUrl: null,
     sourceUrl: 'https://example.invalid/v1',
     ...overrides,
@@ -69,6 +73,13 @@ function fixtureHttp(): MetadataHttpClient & { calls: string[] } {
           description: 'A story.',
           rating: 8.5,
           rank: 17,
+          released: '2020-06-19',
+          languages: ['ja', 'zh-Hans'],
+          platforms: ['win'],
+          tags: [
+            { name: 'Science fiction', rating: 2.7, spoiler: 0 },
+            { name: 'Hidden spoiler', rating: 3, spoiler: 1 },
+          ],
           image: { url: 'https://img.example/atari.jpg' },
           developers: [{ name: 'Frontwing' }],
         }] });
@@ -84,6 +95,10 @@ function fixtureHttp(): MetadataHttpClient & { calls: string[] } {
           summary: 'A story.',
           score: 8.4,
           rank: 18,
+          date: '2020-06-19',
+          platform: 'PC',
+          meta_tags: ['ADV', '科幻'],
+          tags: [{ name: '视觉小说', count: 20 }],
           images: { large: 'https://img.example/atari-bgm.jpg' },
           infobox: [{ key: '开发商', value: [{ v: 'Frontwing' }] }],
         });
@@ -127,7 +142,11 @@ describe('game metadata matching', () => {
   it('normalizes the official VNDB response into a safe candidate', async () => {
     const http = fixtureHttp();
     const [result] = await searchVndb('ATRI', new AbortController().signal, http);
-    expect(result).toMatchObject({ externalId: 'v17', title: 'ATRI', developer: 'Frontwing', imageUrl: 'https://img.example/atari.jpg' });
+    expect(result).toMatchObject({
+      externalId: 'v17', title: 'ATRI', developer: 'Frontwing', imageUrl: 'https://img.example/atari.jpg',
+      releaseDate: '2020-06-19', languages: ['ja', 'zh-Hans'], platforms: ['win'], tags: ['Science fiction'],
+      sourceUrl: 'https://vndb.org/v17',
+    });
   });
 
   it('does not request fields that the current VNDB API no longer exposes', async () => {
@@ -143,6 +162,8 @@ describe('game metadata matching', () => {
 
     expect(requestBody).not.toBeNull();
     expect(String((requestBody as unknown as Record<string, unknown>).fields).split(',')).not.toContain('rank');
+    expect(String((requestBody as unknown as Record<string, unknown>).fields)).toContain('released');
+    expect(String((requestBody as unknown as Record<string, unknown>).fields)).toContain('tags.name');
   });
 
   it('keeps the upstream error body so the import result explains why lookup failed', async () => {
@@ -161,7 +182,11 @@ describe('game metadata matching', () => {
   it('searches Bangumi games and reads the detail for the top result', async () => {
     const http = fixtureHttp();
     const [result] = await searchBangumi('ATRI', new AbortController().signal, http);
-    expect(result).toMatchObject({ externalId: '100', title: 'ATRI', developer: 'Frontwing', imageUrl: 'https://img.example/atari-bgm.jpg' });
+    expect(result).toMatchObject({
+      externalId: '100', title: 'ATRI', developer: 'Frontwing', imageUrl: 'https://img.example/atari-bgm.jpg',
+      releaseDate: '2020-06-19', platforms: ['PC'], tags: ['ADV', '科幻', '视觉小说'],
+      sourceUrl: 'https://bgm.tv/subject/100',
+    });
     expect(http.calls).toContain('https://api.bgm.tv/v0/subjects/100');
   });
 
@@ -235,7 +260,7 @@ describe('metadata migration fixture', () => {
   it('keeps the metadata test database on the current schema', () => {
     const db = new Database(':memory:');
     migrate(db);
-    expect(db.pragma('user_version', { simple: true })).toBe(5);
+    expect(db.pragma('user_version', { simple: true })).toBe(6);
     db.close();
   });
 

@@ -9,15 +9,16 @@ describe('application branding', () => {
   const welcome = readFileSync(path.join(projectRoot, 'src/renderer/src/components/settings/Welcome.tsx'), 'utf8');
   const sharedPaths = readFileSync(path.join(projectRoot, 'src/shared/paths.ts'), 'utf8');
 
-  it('uses NatsumeMusic for the HTML title and Windows product metadata', () => {
-    expect(rendererEntry).toContain('<title>NatsumeMusic</title>');
-    expect(builderConfig).toMatch(/productName:\s*NatsumeMusic/);
-    expect(builderConfig).toMatch(/executableName:\s*NatsumeMusic/);
-    expect(builderConfig).toMatch(/shortcutName:\s*NatsumeMusic/);
+  it('uses NatsumeNote for the HTML title and Windows product metadata', () => {
+    expect(rendererEntry).toContain('<title>NatsumeNote</title>');
+    expect(builderConfig).toMatch(/appId:\s*com\.natsumenote\.app/);
+    expect(builderConfig).toMatch(/productName:\s*NatsumeNote/);
+    expect(builderConfig).toMatch(/executableName:\s*NatsumeNote/);
+    expect(builderConfig).toMatch(/shortcutName:\s*NatsumeNote/);
   });
 
-  it('uses NatsumeMusic in the welcome copy and new-library default', () => {
-    expect(welcome).toContain('NatsumeMusic');
-    expect(sharedPaths).toContain("'NatsumeMusic'");
+  it('uses NatsumeNote in the welcome copy and new-library default', () => {
+    expect(welcome).toContain('NatsumeNote');
+    expect(sharedPaths).toContain("'NatsumeNote'");
   });
 });

@@ -6,12 +6,30 @@ import path from 'node:path';
 
 import { AppError } from '../shared/errors';
 import { assertWithin, sanitizeDirectoryName } from '../shared/paths';
-import type { Game, GameUpdate, Playlist, TrackQuery, TrackUpdate } from '../shared/types';
+import type {
+  Game,
+  GameUpdate,
+  JournalAssetKind,
+  JournalPage,
+  JournalPageCreate,
+  JournalPageDraft,
+  Playlist,
+  TrackQuery,
+  TrackUpdate,
+} from '../shared/types';
 import { getSetting, setSetting } from './database/queries/settings';
 import { deleteGame as deleteGameRecord, getGame, listGames, renameGame as renameGameRecord, setGameCover as setGameCoverRecord } from './database/queries/games';
 import { deleteGameSources } from './database/queries/game-sources';
 import { addTrackToPlaylist, createPlaylist as createPlaylistRecord, deletePlaylist as deletePlaylistRecord, listPlaylistTracks, listPlaylists, removeTrackFromPlaylist } from './database/queries/playlists';
 import { deleteTrack, getTrack, listTracks, updateTrack, updateTrackFilePath } from './database/queries/tracks';
+import {
+  createJournalPage as createJournalPageRecord,
+  deleteJournalPage as deleteJournalPageRecord,
+  listJournalAssets,
+  listJournalPages,
+  saveJournalPage as saveJournalPageRecord,
+  updateJournalAssetPaths,
+} from './database/queries/journal';
 import { openDatabase, type SQLiteDatabase } from './database/connection';
 import { importGameFolder } from './services/importer';
 import { createGameMetadataService, type GameMetadataService } from './services/game-metadata';
@@ -22,6 +40,8 @@ import { normalizeLibraryPath, readAppSettings, saveAppSettings, writeAppSetting
 import { registerAudioProtocol } from './services/audio-protocol';
 import { registerBackgroundProtocol } from './services/background-protocol';
 import { registerCoverProtocol } from './services/cover-protocol';
+import { createJournalAssetService, type JournalAssetService } from './services/journal-assets';
+import { registerJournalMediaProtocol } from './services/journal-media-protocol';
 import { createBulkTrackService, type BulkTrackService } from './services/bulk-track-service';
 import {
   registerDialogHandlers,
@@ -66,6 +86,11 @@ export interface CreateWindowOptions {
 }
 
 let mainWindow: BrowserWindowLike | undefined;
+const APPLICATION_NAME = 'NatsumeNote';
+
+if (app && typeof app.setName === 'function') {
+  app.setName(APPLICATION_NAME);
+}
 
 // The renderer runs from http://localhost during development and from a local
 // bundle after packaging. A privileged streaming scheme works in both modes.
@@ -92,6 +117,16 @@ protocol.registerSchemesAsPrivileged([
   },
   {
     scheme: 'galmusic-background',
+    privileges: {
+      standard: true,
+      secure: true,
+      corsEnabled: true,
+      supportFetchAPI: true,
+      stream: true,
+    },
+  },
+  {
+    scheme: 'galmusic-journal-media',
     privileges: {
       standard: true,
       secure: true,
@@ -150,6 +185,7 @@ export interface DatabaseLibraryServiceOptions {
   getLibraryPath?: () => string | Promise<string>;
   bulkService?: BulkTrackService;
   metadata?: GameMetadataService;
+  journalAssets?: JournalAssetService;
 }
 
 function normalizeTrackQuery(input: TrackQuery | string | null): Required<TrackQuery> {
@@ -202,6 +238,7 @@ export function createDatabaseLibraryService(
 ): LibraryService {
   const resolveLibraryPath = options.getLibraryPath ?? (() => getSetting(db, 'library_path') ?? '');
   const bulkService = options.bulkService ?? createBulkTrackService({ db, getLibraryPath: resolveLibraryPath });
+  const journalAssets = options.journalAssets ?? createJournalAssetService({ db, getLibraryPath: resolveLibraryPath });
   let mutationQueue: Promise<void> = Promise.resolve();
   const enqueueMutation = <T>(mutation: () => Promise<T> | T): Promise<T> => {
     const result = mutationQueue.then(mutation);
@@ -295,6 +332,7 @@ export function createDatabaseLibraryService(
             const relative = path.relative(oldDirectory, track.filePath);
             updateTrackFilePath(db, track.id, path.join(nextDirectory, relative));
           }
+          updateJournalAssetPaths(db, oldDirectory, nextDirectory);
         }
 
         let nextCoverPath = existing.coverPath;
@@ -405,6 +443,23 @@ export function createDatabaseLibraryService(
       removeTrackFromPlaylist(db, playlistId, trackId);
     },
     bulkUpdateTracks: (request) => enqueueMutation(() => bulkService.execute(request)),
+    getJournalPages: (gameId: string): JournalPage[] => listJournalPages(db, gameId),
+    createJournalPage: (input: JournalPageCreate): JournalPage => {
+      const game = getGame(db, input.gameId);
+      if (!game) {
+        throw new AppError('FILE_NOT_FOUND', `Game not found: ${input.gameId}`, '找不到指定的作品。');
+      }
+      return createJournalPageRecord(db, input);
+    },
+    saveJournalPage: (draft: JournalPageDraft): Promise<JournalPage> => enqueueMutation(() => saveJournalPageRecord(db, draft)),
+    deleteJournalPage: (pageId: string): void => {
+      if (!deleteJournalPageRecord(db, pageId)) {
+        throw new AppError('FILE_NOT_FOUND', `Journal page not found: ${pageId}`, '找不到指定的手账页面。');
+      }
+    },
+    getJournalAssets: (gameId: string) => listJournalAssets(db, gameId),
+    listJournalAssets: (gameId) => journalAssets.list(gameId),
+    importJournalAssets: (gameId, kind, filePaths) => enqueueMutation(() => journalAssets.importFiles(gameId, kind, filePaths)),
     updateGame: (gameId, changes) => enqueueMutation(() => updateGameNow(gameId, changes)),
     getGameMetadata: options.metadata
       ? (gameId) => options.metadata!.ensure(gameId, { signal: new AbortController().signal })
@@ -485,7 +540,17 @@ export function registerIpcHandlers({
     importer: services.importer,
     getLibraryPath: resolveLibraryPath,
   });
-  registerDialogHandlers({ ipcMain: main, dialog: appDialog, shell: appShell, onImageSelected: (filePath) => { appearanceAuthorization.previewBackgroundPath = filePath; } });
+  registerDialogHandlers({
+    ipcMain: main,
+    dialog: appDialog,
+    shell: appShell,
+    onImageSelected: (filePath) => { appearanceAuthorization.previewBackgroundPath = filePath; },
+    onJournalMediaSelected: async (gameId, kind, filePaths) => {
+      const importer = services.library.importJournalAssets;
+      if (!importer) throw new AppError('DB_ERROR', 'Journal media importer is not configured', '手账素材导入暂不可用。');
+      return await importer(gameId, kind as JournalAssetKind, filePaths);
+    },
+  });
   registerWindowHandlers({
     ipcMain: main,
     getWindow: (event) => {
@@ -507,7 +572,7 @@ export async function bootstrapMainProcess(options: BootstrapOptions = {}): Prom
   const userDataDirectory = options.userDataDirectory ?? app.getPath('userData');
   configureGarbroLogPath(path.join(userDataDirectory, 'logs', 'garbro.log'));
   const db = openDatabase(userDataDirectory);
-  const defaultLibrary = path.join(app.getPath('music'), 'NatsumeMusic');
+  const defaultLibrary = path.join(app.getPath('music'), APPLICATION_NAME);
   const legacyDefaultLibrary = path.join(app.getPath('music'), 'GalMusic');
   if (!getSetting(db, 'library_path')) {
     setSetting(db, 'library_path', existsSync(legacyDefaultLibrary) ? legacyDefaultLibrary : defaultLibrary);
@@ -544,6 +609,11 @@ export async function bootstrapMainProcess(options: BootstrapOptions = {}): Prom
     getLibraryPath: services.getLibraryPath ?? (() => getSetting(db, 'library_path') ?? defaultLibrary),
   });
   registerCoverProtocol({
+    protocol,
+    fetchFile: (fileUrl) => net.fetch(fileUrl),
+    getLibraryPath: services.getLibraryPath ?? (() => getSetting(db, 'library_path') ?? defaultLibrary),
+  });
+  registerJournalMediaProtocol({
     protocol,
     fetchFile: (fileUrl) => net.fetch(fileUrl),
     getLibraryPath: services.getLibraryPath ?? (() => getSetting(db, 'library_path') ?? defaultLibrary),

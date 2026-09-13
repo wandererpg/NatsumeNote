@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Verify the resources required by a distributable NatsumeMusic build.
+ * Verify the resources required by a distributable NatsumeNote build.
  *
  * This repository currently carries a GARbro bundle under resources/tools.
  * The verifier checks that a build has the files it needs; it does not prove
@@ -54,12 +54,12 @@ export async function verifyResources(resourceRoot = parseRoot(process.argv.slic
   if (missing.length > 0) {
     const garbroPath = path.join(resourceRoot, 'tools', 'garbro', 'GARbro.exe');
     const lines = [
-      'NatsumeMusic resource verification failed.',
+      'NatsumeNote resource verification failed.',
       ...missing.map((filePath) => filePath.endsWith(path.join('garbro', 'GARbro.exe'))
         ? `GARbro.exe is missing or empty: ${filePath}`
         : `Missing or empty file: ${filePath}`),
       '',
-      'Supply the complete licensed GARbro bundle and NatsumeMusic XP3 bridge under:',
+      'Supply the complete licensed GARbro bundle and NatsumeNote XP3 bridge under:',
       `  ${path.dirname(garbroPath)}`,
       'or pass --root <resources-root> (or GALMUSIC_RESOURCE_ROOT) for a staging/fixture directory.',
     ];
@@ -78,7 +78,7 @@ export async function verifyResources(resourceRoot = parseRoot(process.argv.slic
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
     const result = await verifyResources();
-    console.log(`NatsumeMusic resources verified: ${result.resourceRoot}`);
+    console.log(`NatsumeNote resources verified: ${result.resourceRoot}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

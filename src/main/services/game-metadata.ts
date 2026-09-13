@@ -38,6 +38,10 @@ export interface NormalizedMetadataCandidate {
   summary: string | null;
   score: number | null;
   rank: number | null;
+  releaseDate: string | null;
+  languages: string[];
+  platforms: string[];
+  tags: string[];
   imageUrl: string | null;
   sourceUrl: string;
 }
@@ -51,7 +55,7 @@ export interface CandidateResolution {
 const SOURCE_ORDER: MetadataSource[] = ['vndb', 'bangumi'];
 const SOURCE_RETRY_MINUTES = 30;
 const REQUEST_TIMEOUT_MS = 12_000;
-const APPLICATION_USER_AGENT = 'NatsumeMusic/0.1.0';
+const APPLICATION_USER_AGENT = 'NatsumeNote/0.1.0';
 
 /** Normalize only search/matching input; the display name remains unchanged. */
 export function normalizeGameName(input: string): string {
@@ -132,6 +136,11 @@ export function summarizeCandidate(
     summary: matched?.summary ?? null,
     score: matched?.score ?? null,
     rank: matched?.rank ?? null,
+    releaseDate: matched?.releaseDate ?? null,
+    languages: matched?.languages ?? [],
+    platforms: matched?.platforms ?? [],
+    tags: matched?.tags ?? [],
+    sourceUrl: matched?.sourceUrl ?? null,
     fetchedAt,
     errorMessage,
   };
@@ -169,6 +178,32 @@ function asStringArray(value: unknown): string[] {
     }
     return [];
   });
+}
+
+function uniqueStrings(values: Array<string | null | undefined>, limit = 12): string[] {
+  return [...new Set(values.filter((value): value is string => Boolean(value?.trim())).map((value) => value.trim()))].slice(0, limit);
+}
+
+function vndbTags(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(asRecord)
+    .filter((tag) => (asNumber(tag.spoiler) ?? 0) === 0)
+    .sort((left, right) => (asNumber(right.rating) ?? 0) - (asNumber(left.rating) ?? 0))
+    .map((tag) => asString(tag.name))
+    .filter((tag): tag is string => Boolean(tag))
+    .slice(0, 12);
+}
+
+function bangumiTags(detail: Record<string, unknown>, search: Record<string, unknown>): string[] {
+  const namedTags = Array.isArray(detail.tags)
+    ? detail.tags.map((tag) => asString(asRecord(tag).name))
+    : [];
+  return uniqueStrings([
+    ...asStringArray(detail.meta_tags),
+    ...asStringArray(search.meta_tags),
+    ...namedTags,
+  ]);
 }
 
 function httpsImage(value: unknown): string | null {
@@ -237,6 +272,10 @@ function vndbCandidate(value: unknown): NormalizedMetadataCandidate | null {
     summary: asString(row.description),
     score: asNumber(row.rating),
     rank: asNumber(row.rank),
+    releaseDate: asString(row.released),
+    languages: uniqueStrings(asStringArray(row.languages), 8),
+    platforms: uniqueStrings(asStringArray(row.platforms), 8),
+    tags: vndbTags(row.tags),
     imageUrl: httpsImage(image.url),
     sourceUrl: sourceUrl('vndb', externalId),
   };
@@ -251,7 +290,7 @@ export async function searchVndb(name: string, signal: AbortSignal, http: Metada
       filters: ['search', '=', name],
       // `rank` was removed from the current Kana API field set. Requesting it
       // makes an otherwise valid search fail with HTTP 400.
-      fields: 'id,title,alttitle,aliases,description,developers.name,rating,image.url',
+      fields: 'id,title,alttitle,aliases,description,developers.name,rating,released,languages,platforms,tags.name,tags.rating,tags.spoiler,image.url',
       results: 10,
       sort: 'searchrank',
     }),
@@ -292,6 +331,15 @@ function bangumiCandidate(search: Record<string, unknown>, detail: Record<string
     summary: asString(detail.summary) ?? asString(search.summary),
     score: asNumber(detail.score) ?? asNumber(search.score),
     rank: asNumber(detail.rank) ?? asNumber(search.rank),
+    releaseDate: asString(detail.date) ?? asString(search.date),
+    languages: [],
+    platforms: uniqueStrings([
+      asString(detail.platform),
+      ...asStringArray(detail.platform),
+      asString(search.platform),
+      ...asStringArray(search.platform),
+    ], 8),
+    tags: bangumiTags(detail, search),
     imageUrl,
     sourceUrl: sourceUrl('bangumi', externalId),
   };

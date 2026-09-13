@@ -1,12 +1,12 @@
-# NatsumeMusic 实际运行逻辑与代码地图
+# NatsumeNote 实际运行逻辑与代码地图
 
-> 本文档以当前工作区源码为准，记录 NatsumeMusic 的真实运行方式、数据流、文件布局和现有实现边界。原有的 `GalMusic-设计文档.md` 是目标设计规格；若两者不一致，以本文和源码为准。
+> 本文档以当前工作区源码为准，记录 NatsumeNote 的真实运行方式、数据流、文件布局和现有实现边界。原有的 `GalMusic-设计文档.md` 是早期目标设计规格；若两者不一致，以本文和源码为准。
 >
-> 核对日期：2026-08-23（Asia/Shanghai）
+> 核对日期：2026-09-13（Asia/Shanghai）
 
 ## 1. 一句话概括
 
-NatsumeMusic 是一个 Windows 离线音乐库与播放器：用户选择游戏目录，主进程扫描普通音频并可调用 GARbro 解包资源，将音频复制到独立音乐库；SQLite 保存游戏、曲目、播放列表和设置；React 渲染进程通过 preload 暴露的白名单 API 查询库并用 Howler 播放受保护的音频协议。
+NatsumeNote 是一个 Windows 离线音乐库、播放器和按作品组织的分页手账：用户选择游戏目录，主进程扫描普通音频并可调用 GARbro 解包资源，将音频复制到独立音乐库；SQLite 保存游戏、曲目、播放列表、作品详情和手账页面；React 渲染进程通过 preload 暴露的白名单 API 查询库、编辑手账，并用 Howler 播放受保护的音频协议。
 
 核心原则是：
 
@@ -14,6 +14,7 @@ NatsumeMusic 是一个 Windows 离线音乐库与播放器：用户选择游戏�
 - 主进程拥有文件系统、SQLite、解包和 IPC 权限。
 - 渲染进程没有 Node.js 文件系统权限，只能使用 `window.galMusic`。
 - 音频播放发生在渲染进程，但音频字节由主进程的 `galmusic-audio://` 协议提供。
+- 手账页面数据保存在 SQLite；图片和视频会复制到当前作品目录下的 `手账/素材`，通过 `galmusic-journal-media://` 提供受控访问。
 - 数据库中的显示名称、文件路径、收藏状态等和实际复制文件分别管理。
 
 ## 2. 当前验证状态
@@ -22,7 +23,7 @@ NatsumeMusic 是一个 Windows 离线音乐库与播放器：用户选择游戏�
 
 | 检查 | 结果 |
 | --- | --- |
-| `npm test` | 42 个测试文件、205 个测试全部通过 |
+| `npm test -- --run` | 54 个测试文件、279 个测试全部通过 |
 | `npx tsc --noEmit` | 通过 |
 | `npm run build` | main、preload、renderer 均构建通过 |
 | `node scripts/verify-resources.mjs` | 通过，当前 `resources/tools` 中的 GARbro 资源完整 |
@@ -41,13 +42,13 @@ NatsumeMusic 是一个 Windows 离线音乐库与播放器：用户选择游戏�
 │   ├─ DatabaseLibraryService                                         │
 │   ├─ Importer → Scanner / Extractor / Copy / Metadata               │
 │   ├─ IPC handlers                                                    │
-│   └─ audio://、cover://、background:// 安全本地资源协议             │
+│   └─ audio://、cover://、background://、journal-media:// 安全资源协议 │
 │                                                                     │
 ├──────────────────── preload contextBridge ──────────────────────────┤
 │  只暴露 GalMusicAPI；不暴露 ipcRenderer、fs、path 或其他 Node API     │
 ├─────────────────────────────────────────────────────────────────────┤
 │ React 渲染进程                                                       │
-│  App → Sidebar / TrackTable / ScanDialog / Settings / PlayerBar      │
+│  App → Sidebar / TrackTable / ScanDialog / Settings / Journal / Player │
 │  Zustand libraryStore / uiStore / playerStore                       │
 │  PlayerEngine → Howler → galmusic-audio://                           │
 └─────────────────────────────────────────────────────────────────────┘
@@ -84,7 +85,7 @@ Electron app.whenReady()
 openDatabase(userData/galmusic.db)
         │  WAL + busy_timeout + migrations
         ▼
-设置 library_path（新用户默认 app.getPath('music')/NatsumeMusic；检测到旧 GalMusic 目录时继续沿用）
+设置 library_path（新用户默认 app.getPath('music')/NatsumeNote；检测到旧 GalMusic 目录时继续沿用）
         │
         ├─ normalizeLibraryPath（展开环境变量、兼容旧路径）
         ├─ backfillMissingTrackMetadata（补 duration/title）
@@ -93,9 +94,10 @@ openDatabase(userData/galmusic.db)
         ▼
 创建 importer + database library service
         │
-        ├─ registerAudioProtocol
-        ├─ registerCoverProtocol
-        ├─ registerLibraryHandlers
+    ├─ registerAudioProtocol
+    ├─ registerCoverProtocol
+    ├─ registerJournalMediaProtocol
+    ├─ registerLibraryHandlers
         ├─ registerScanHandlers
         ├─ registerDialogHandlers
         └─ registerWindowHandlers
@@ -115,14 +117,14 @@ createMainWindow() → renderer
 
 | 目录/文件 | 实际职责 |
 | --- | --- |
-| `src/shared/types.ts` | Game、Track、Playlist、Scan、Player、Settings 等跨进程类型 |
+| `src/shared/types.ts` | Game、Track、Playlist、Scan、Player、Settings、Journal 等跨进程类型 |
 | `src/shared/ipc.ts` | IPC channel 常量、`GalMusicAPI` 接口、事件载荷类型 |
 | `src/shared/paths.ts` | 默认路径、Windows 目录名清理、根目录 containment 校验 |
 | `src/shared/errors.ts` | `AppError`、错误码和 IPC 安全序列化 |
-| `src/shared/audio-url.ts` / `cover-url.ts` | 协议 URL 编码与解析 |
+| `src/shared/audio-url.ts` / `cover-url.ts` / `journal-media-url.ts` | 受控资源协议 URL 编码与解析 |
 | `src/main/database/connection.ts` | SQLite 路径、连接、WAL 和迁移入口 |
-| `src/main/database/migrations.ts` | schema version 1–4、表和索引 |
-| `src/main/database/queries/*` | games、tracks、playlists、settings 的 SQL CRUD |
+| `src/main/database/migrations.ts` | schema version 1–6、表和索引 |
+| `src/main/database/queries/*` | games、tracks、playlists、settings、journal pages/assets 的 SQL CRUD |
 | `src/main/services/scanner.ts` | 普通目录递归、音频筛选、sidecar 标题、元数据和 MD5 |
 | `src/main/services/scanner-worker.ts` | 可独立运行的 worker scanner 封装；当前生产导入链路没有接入它 |
 | `src/main/services/importer.ts` | 扫描、解包、分类、去重、复制和 SQLite 持久化的总编排器 |
@@ -137,16 +139,19 @@ createMainWindow() → renderer
 | `src/main/services/bulk-track-service.ts` | 批量收藏、加入列表、移动和删除，含文件/数据库回滚 |
 | `src/main/services/audio-protocol.ts` | 只允许音乐库内音频，支持 Range 请求 |
 | `src/main/services/cover-protocol.ts` | 只允许音乐库内图片 |
+| `src/main/services/journal-assets.ts` | 手账图片/视频导入、SHA-256 去重和素材路径管理 |
+| `src/main/services/journal-media-protocol.ts` | 只允许当前音乐库内手账素材，支持图片/视频 Range 请求 |
 | `src/main/ipc/*` | 参数校验、对话框、库、扫描和窗口命令的 handler |
 | `src/renderer/src/stores/*` | 库查询、UI 选择、播放状态的 Zustand store |
 | `src/renderer/src/player/PlayerEngine.ts` | Howler 生命周期、队列、模式和时间更新 |
 | `src/renderer/src/components/*` | React 视图、编辑器、扫描界面、批量操作和播放器栏 |
+| `src/renderer/src/features/journal/*` | 手账页面模型、历史记录、编辑工作区和 PNG/SVG 导出 |
 | `scripts/*` | Electron 测试启动器、资源校验 |
 | `resources/tools/*` | GARbro 资源和 RPA bridge；打包时作为 extraResources 携带 |
 
 ## 6. 数据库模型
 
-当前 schema version 是 4。数据库文件位于 Electron 的 user data 目录：
+当前 schema version 是 6。数据库文件位于 Electron 的 user data 目录：
 
 ```text
 <userData>/galmusic.db
@@ -161,9 +166,13 @@ createMainWindow() → renderer
 | `playlists` | `id`, `name`, `created_at` | 用户创建的播放列表 |
 | `playlist_tracks` | `playlist_id`, `track_id`, `position` | 播放列表与曲目的多对多关系，按 position 排序 |
 | `settings` | `key`, `value` | 所有设置按字符串保存 |
+| `journal_pages` | `id`, `game_id`, `title`, `position`, `canvas_width`, `canvas_height`, `background_json`, `blocks_json`, `tags_json`, `soundtrack_track_id`, `revision` | 每部作品的有序手账页面；画布背景和卡片场景以 JSON 保存，页面 BGM 通过曲目外键引用 |
+| `journal_assets` | `id`, `game_id`, `kind`, `file_path`, `file_name`, `mime_type`, `file_size`, `file_hash` | 已复制到作品 `手账/素材` 目录的图片/视频；同一作品按哈希去重 |
 | `schema_migrations` | `version`, `applied_at` | 迁移记录 |
 
 `tracks.kind` 只能是 `music` 或 `voice`。删除游戏或曲目时，SQLite 外键级联删除关联记录；主进程启动时开启 `foreign_keys = ON`。
+
+删除游戏会级联删除该游戏的手账页面和素材记录，随后由库服务清理对应的游戏目录。删除作为页面 BGM 的曲目只会把 `soundtrack_track_id` 置空，页面本身仍然保留。
 
 ### 6.2 对外 Track 映射
 
@@ -215,6 +224,12 @@ g.name       → gameName
 | `library:update-game` | 重命名游戏、设置/清除封面 | 可能移动整个游戏目录并同步曲目路径 |
 | `library:delete-game` | 删除游戏 | 先暂存目录，再事务删除记录，成功后删除暂存目录 |
 | `library:bulk-update-tracks` | 批量收藏、列表、移动、删除 | 返回成功 ID 和逐条失败原因 |
+| `library:get-journal-pages` | 读取作品手账页面 | 按 `position`、创建时间返回页面和完整卡片场景 |
+| `library:create-journal-page` | 新建手账页面 | 创建独立页面，支持初始画布、背景、标签、卡片和页面 BGM |
+| `library:save-journal-page` | 保存手账页面 | 带 `revision` 的乐观并发检查，拒绝过期草稿覆盖新版本 |
+| `library:delete-journal-page` | 删除手账页面 | 删除单个页面；界面不允许删除作品的最后一页 |
+| `library:get-journal-assets` | 读取作品手账素材 | 返回已导入图片/视频的文件元数据，不暴露原始文件系统 API |
+| `journal:select-media` | 选择并导入手账媒体 | 原生选择图片/视频，复制到作品 `手账/素材` 并按 SHA-256 去重 |
 | `dialog:select-folder` | 选择目录 | 返回路径或 null |
 | `dialog:select-files` | 选择音频文件 | 支持多选，包含 `.owp` |
 | `dialog:select-image` | 选择封面图片 | 只接受 PNG/JPG/WEBP/GIF |
@@ -375,6 +390,10 @@ track (2).ogg
    │  └─ track (1).ogg
    ├─ 语音/
    │  └─ line.mp3
+   ├─ 手账/
+   │  └─ 素材/
+   │     ├─ <uuid>.png
+   │     └─ <uuid>.mp4
    └─ .cover.png
 ```
 
@@ -384,6 +403,7 @@ track (2).ogg
 - 写磁盘时用 `sanitizeDirectoryName` 替换 Windows 非法字符，并处理 `CON`、`PRN` 等保留设备名。
 - 游戏名在 IPC 层还禁止路径分隔符、`.` 和 `..`。
 - 音乐和语音用独立子目录隔离。
+- 手账媒体放在 `手账/素材`，文件名使用随机 ID，数据库通过 `journal_assets` 记录原始文件名、类型、大小和哈希。
 - 封面复制到游戏目录内的 `.cover.<ext>`，不保存源图片路径作为唯一依赖。
 - 同一个游戏目录内不覆盖已有文件。
 - 设置音乐库路径只更新设置值；真正的旧库迁移在下次启动的布局迁移流程中按当前配置处理，不会在设置保存动作里自动搬运整库。
@@ -395,6 +415,7 @@ track (2).ogg
 ```text
 galmusic-audio://local?path=<urlencoded absolute path>
 galmusic-cover://local?path=<urlencoded absolute path>
+galmusic-journal-media://local?path=<urlencoded absolute path>
 ```
 
 主进程协议 handler 会：
@@ -404,6 +425,7 @@ galmusic-cover://local?path=<urlencoded absolute path>
 3. 检查路径位于当前音乐库根目录内。
 4. 音频请求支持 HTTP Range，方便 Howler/HTML5 Audio 拖动进度和流式读取。
 5. 封面只允许 PNG、JPG、JPEG、WEBP、GIF。
+6. 手账媒体只允许作品目录 `手账/素材` 内的 PNG/JPG/JPEG/WEBP/GIF/MP4/WEBM/OGV/MOV，并支持 Range 请求以便视频预览。
 
 `assertWithin` 使用 `path.relative` 判断 containment，避免把 `game-old` 误判成 `game` 的子路径。批量移动/删除另外会解析 realpath，防止库内符号链接把文件操作引到音乐库外。
 
@@ -428,7 +450,7 @@ galmusic-cover://local?path=<urlencoded absolute path>
 
 1. 计算旧的游戏目录和新的安全目录名。
 2. 目标目录不存在时移动整个目录；若冲突则拒绝。
-3. 在一条数据库事务中更新游戏名、所有曲目路径和封面路径。
+3. 在一条数据库事务中更新游戏名、所有曲目路径、封面路径和手账素材路径。
 4. 新封面先复制到新目录的 `.cover.<ext>`。
 5. 数据库成功后删除旧封面；出错时尽力恢复目录和新封面。
 
@@ -466,12 +488,46 @@ galmusic-cover://local?path=<urlencoded absolute path>
 - 游戏条目显示封面/首字母和曲目数量。
 - 游戏详情可以编辑显示名、封面和删除整个音乐文件夹。
 - 曲目可以播放、改显示名、收藏、加入/移出播放列表、打开文件夹、从库删除。
+- 选中具体游戏后可以在“曲目”“作品手账”“作品资料”三个视图之间切换。
 - 选中具体游戏后才启用多选、Shift 范围选择和批量操作。
 - 超过视口的曲目使用固定行高虚拟列表，不一次挂载全部行。
 - 导入窗口是文件夹优先流程，自动打开一次原生文件夹选择器。
 - 设置面板保存音乐库路径、默认音量和播放模式。
 
-### 13.3 播放器
+### 13.3 作品手账工作区
+
+作品手账由 [`src/renderer/src/features/journal/JournalWorkspace.tsx`](../src/renderer/src/features/journal/JournalWorkspace.tsx) 提供，页面和素材都按 `gameId` 隔离。工作区首次打开时只读取页面和素材；没有页面时会创建一个带便签的初始页面。旧版本页面中的作品详情卡会在加载时过滤，联网资料集中显示在“作品资料”中。没有 preload bridge 的渲染测试环境使用内存回退数据，不影响正式运行时的持久化路径。
+
+编辑器的主要状态流是：
+
+```text
+选择作品 → library:get-journal-pages / library:get-journal-assets
+             │
+             ▼
+JournalHistory（最多保留 80 个历史状态）
+             │
+             ├─ 便签/引用/曲目卡编辑
+             ├─ 图片/视频导入 → journal:select-media → 素材协议 URL
+             ├─ 拖动/缩放/旋转/锁定/层级调整
+             └─ 画布扩展、背景纹理、页面 BGM
+             │
+             ▼
+      900ms 防抖自动保存 + 显式“保存”
+```
+
+页面变换集中在 [`src/renderer/src/features/journal/journal-model.ts`](../src/renderer/src/features/journal/journal-model.ts)，使用不可变页面快照处理卡片增删、移动、尺寸、旋转、层级和画布扩展。画布按 320×240 的步长向右/向下增长；拖动或缩放超出边界时也会自动扩展。保存接口带 `revision`，主进程会拒绝过期草稿覆盖较新的页面。
+
+当前卡片类型为：
+
+- 便签、引用卡：适合游玩笔记、感想和台词摘录；便签可调整纸张颜色、文字颜色和字号。
+- 图片卡、视频卡：素材导入后复制到作品目录，渲染只使用受控 `galmusic-journal-media://` URL。
+- 曲目卡：引用已有曲目，可记录播放起点；页面 BGM 也通过曲目 ID 保存。
+
+VNDB/Bangumi 资料不会作为白板卡片出现。音乐导入成功后主进程会自动抓取并缓存资料；“作品资料”保留手动刷新入口，供网络恢复或名称调整后重新查询。
+
+编辑器支持 `Ctrl/Cmd+Z`、`Ctrl/Cmd+Shift+Z`、`Ctrl/Cmd+D`，并提供当前页面 PNG/SVG 导出。记忆模式是只读的逐页阅读视图，上一页/下一页和 BGM 都需要用户主动操作，不会自动播放。
+
+### 13.4 播放器
 
 播放器由 [`PlayerEngine`](../src/renderer/src/player/PlayerEngine.ts) 和 `playerStore` 组成：
 
@@ -531,7 +587,7 @@ node scripts/verify-resources.mjs
 npm run package:win
 ```
 
-`postinstall` 和 `predev` 会用 `electron-rebuild` 为 Electron 31.7.7 重编译 `better-sqlite3`。
+`postinstall` 和 `predev` 会运行 `scripts/ensure-electron-native.mjs`：先在 Electron 的 Node 运行时中实际加载 `better-sqlite3`，兼容时直接跳过；缺失或 ABI 不匹配时，通过 `prebuild-install` 获取与当前 Electron 对应的官方预编译文件。Node 支持时下载进程会启用系统 CA，兼容带企业代理/自签根证书的 Windows 环境。只有显式运行 `npm run rebuild:native:source` 才会调用 `electron-rebuild --force` 从源码编译，并要求 Python 和 Visual Studio C++ 工具链。
 
 ### 15.2 打包结构
 
@@ -567,7 +623,7 @@ extract-rpa.mjs
 3. **当前归档集合不含 `.dat`。** 实际 `ARCHIVE_EXTENSIONS` 是 `.xp3/.rpa/.arc/.pak`。
 4. **RPA bridge 不是完整 RPA 解码器。** `extract-rpa.mjs` 会验证参数和文件存在，然后以失败状态让 extractor 回退到 GARbro。
 5. **手动文件选择 API 已存在，但主界面当前是文件夹优先。** preload 和 service 支持 `selectFiles`/`addTracks`，但当前 `App` 没有把它们作为独立入口接入 UI。
-6. **拖拽、系统托盘、媒体键、在线元数据和波形没有当前实现。** 当前程序坚持离线，不包含 VGMdb 等联网模块。
+6. **自由笔刷、系统托盘、媒体键和波形没有当前实现。** 当前已实现 VNDB/Bangumi 在线资料、作品手账和卡片式拖拽画布，但还不包含自由笔刷、橡皮擦或 VGMdb 等其他联网模块。
 7. **统计服务不是完整目标接口。** 数据库有游戏/曲目计数查询，但当前共享 API 没有独立的 `getStats` IPC。
 8. **设置音乐库路径不会立即搬迁整库。** 设置保存只是写入 `library_path`；旧路径修复和布局迁移发生在启动阶段。
 9. **旧的 `docs/verification.md` 记录曾描述 GARbro 缺失。** 当前实际资源校验已经通过，应以本次命令结果为准。

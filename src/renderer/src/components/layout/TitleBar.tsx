@@ -47,7 +47,7 @@ export function TitleBar({
           <span className="brand-mark__dot" />
         </div>
         <div className="brand-lockup">
-            <span className="brand-lockup__name">NatsumeMusic</span>
+            <span className="brand-lockup__name">NatsumeNote</span>
           <span className="brand-lockup__hint">AFTERGLOW LIBRARY</span>
         </div>
       </div>

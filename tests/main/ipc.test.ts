@@ -11,8 +11,14 @@ import {
   IPC_LIBRARY_GET_GAMES,
   IPC_LIBRARY_GET_TRACKS,
   IPC_LIBRARY_GET_GAME_METADATA,
+  IPC_LIBRARY_GET_JOURNAL_PAGES,
+  IPC_LIBRARY_CREATE_JOURNAL_PAGE,
+  IPC_LIBRARY_SAVE_JOURNAL_PAGE,
+  IPC_LIBRARY_DELETE_JOURNAL_PAGE,
+  IPC_LIBRARY_GET_JOURNAL_ASSETS,
   IPC_LIBRARY_REFRESH_GAME_METADATA,
   IPC_LIBRARY_UPDATE_GAME,
+  IPC_JOURNAL_SELECT_MEDIA,
   IPC_SCAN_CANCEL,
   IPC_SCAN_START,
 } from '../../src/shared/ipc';
@@ -45,6 +51,29 @@ class FakeIpcMain {
 }
 
 describe('main-process IPC handlers', () => {
+  it('selects and imports scrapbook media entirely in the main process', async () => {
+    const ipcMain = new FakeIpcMain();
+    const dialog = { showOpenDialog: vi.fn().mockResolvedValue({ canceled: false, filePaths: ['D:\\Pictures\\memory.png'] }) };
+    const imported = [{ id: 'asset-1', gameId: 'g1', kind: 'image', fileName: 'memory.png' }];
+    const onJournalMediaSelected = vi.fn().mockResolvedValue(imported);
+    registerDialogHandlers({
+      ipcMain,
+      dialog,
+      shell: { openPath: vi.fn().mockResolvedValue('') },
+      onJournalMediaSelected,
+    });
+
+    await expect(ipcMain.invoke(IPC_JOURNAL_SELECT_MEDIA, 'g1', 'image')).resolves.toEqual(imported);
+    expect(dialog.showOpenDialog).toHaveBeenCalledWith(undefined, expect.objectContaining({
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
+    }));
+    expect(onJournalMediaSelected).toHaveBeenCalledWith('g1', 'image', ['D:\\Pictures\\memory.png']);
+
+    await expect(ipcMain.invoke(IPC_JOURNAL_SELECT_MEDIA, 'g1', 'document')).rejects.toMatchObject({ code: 'DB_ERROR' });
+    expect(onJournalMediaSelected).toHaveBeenCalledTimes(1);
+  });
+
   it('offers OWP files in the audio file picker', async () => {
     const ipcMain = new FakeIpcMain();
     const dialog = { showOpenDialog: vi.fn().mockResolvedValue({ canceled: false, filePaths: [] }) };
@@ -179,6 +208,41 @@ describe('main-process IPC handlers', () => {
     await expect(ipcMain.invoke(IPC_LIBRARY_GET_GAME_METADATA, 'g1', 'extra')).rejects.toMatchObject({ code: 'DB_ERROR' });
     expect(library.getGameMetadata).toHaveBeenCalledWith('g1');
     expect(library.refreshGameMetadata).toHaveBeenCalledWith('g1');
+  });
+
+  it('validates and routes scrapbook page persistence requests', async () => {
+    const ipcMain = new FakeIpcMain();
+    const page = {
+      id: 'page-1', gameId: 'g1', title: '第一页', position: 0, canvasWidth: 960, canvasHeight: 680,
+      background: { color: '#fffaf0', pattern: 'paper' }, blocks: [], tags: [], soundtrackTrackId: null,
+      revision: 0, createdAt: '', updatedAt: '',
+    };
+    const draft = {
+      id: page.id, gameId: page.gameId, title: page.title, position: page.position,
+      canvasWidth: page.canvasWidth, canvasHeight: page.canvasHeight, background: page.background,
+      blocks: page.blocks, tags: page.tags, soundtrackTrackId: page.soundtrackTrackId, revision: page.revision,
+    };
+    const library = {
+      getGames: vi.fn(),
+      getTracks: vi.fn(),
+      getJournalPages: vi.fn().mockResolvedValue([page]),
+      createJournalPage: vi.fn().mockResolvedValue(page),
+      saveJournalPage: vi.fn().mockResolvedValue({ ...page, revision: 1 }),
+      deleteJournalPage: vi.fn().mockResolvedValue(undefined),
+      getJournalAssets: vi.fn().mockResolvedValue([]),
+    };
+    registerLibraryHandlers({ ipcMain, library });
+
+    await expect(ipcMain.invoke(IPC_LIBRARY_GET_JOURNAL_PAGES, 'g1')).resolves.toEqual([page]);
+    await expect(ipcMain.invoke(IPC_LIBRARY_CREATE_JOURNAL_PAGE, {
+      id: page.id, gameId: page.gameId, title: page.title, canvasWidth: page.canvasWidth, canvasHeight: page.canvasHeight,
+      background: page.background, blocks: page.blocks, tags: page.tags, soundtrackTrackId: null,
+    })).resolves.toEqual(page);
+    await expect(ipcMain.invoke(IPC_LIBRARY_SAVE_JOURNAL_PAGE, draft)).resolves.toMatchObject({ revision: 1 });
+    await expect(ipcMain.invoke(IPC_LIBRARY_DELETE_JOURNAL_PAGE, page.id)).resolves.toBeUndefined();
+    await expect(ipcMain.invoke(IPC_LIBRARY_GET_JOURNAL_ASSETS, page.gameId)).resolves.toEqual([]);
+    await expect(ipcMain.invoke(IPC_LIBRARY_SAVE_JOURNAL_PAGE, { ...page, unexpected: true })).rejects.toMatchObject({ code: 'DB_ERROR' });
+    expect(library.saveJournalPage).toHaveBeenCalledWith(expect.objectContaining({ id: page.id, revision: 0 }));
   });
 
   it('rejects an invalid voice option before starting a scan', async () => {

@@ -6,6 +6,11 @@ import {
   IPC_APP_SET_SETTING,
   IPC_LIBRARY_ADD_TRACKS,
   IPC_LIBRARY_BULK_UPDATE_TRACKS,
+  IPC_LIBRARY_GET_JOURNAL_PAGES,
+  IPC_LIBRARY_CREATE_JOURNAL_PAGE,
+  IPC_LIBRARY_SAVE_JOURNAL_PAGE,
+  IPC_LIBRARY_DELETE_JOURNAL_PAGE,
+  IPC_LIBRARY_GET_JOURNAL_ASSETS,
   IPC_LIBRARY_DELETE_TRACK,
   IPC_LIBRARY_DELETE_GAME,
   IPC_LIBRARY_ADD_TRACK_TO_PLAYLIST,
@@ -32,6 +37,11 @@ import type {
   Game,
   GameMetadataSummary,
   GameUpdate,
+  JournalAsset,
+  JournalAssetKind,
+  JournalPage,
+  JournalPageCreate,
+  JournalPageDraft,
   Playlist,
   Track,
   TrackQuery,
@@ -45,6 +55,7 @@ import {
   assertString,
   invalidArgument,
 } from './validation';
+import { validateJournalPageCreate, validateJournalPageDraft } from './journal-validation';
 import { isValidVoiceThreshold } from '../services/track-classification';
 
 export interface IpcMainLike {
@@ -69,6 +80,13 @@ export interface LibraryService {
   refreshGameMetadata?(gameId: string): Promise<GameMetadataSummary> | GameMetadataSummary;
   deleteGame?(gameId: string): Promise<void> | void;
   bulkUpdateTracks?(request: BulkTrackRequest): Promise<BulkTrackResult> | BulkTrackResult;
+  listJournalAssets?(gameId: string): Promise<JournalAsset[]> | JournalAsset[];
+  importJournalAssets?(gameId: string, kind: JournalAssetKind, filePaths: string[]): Promise<JournalAsset[]> | JournalAsset[];
+  getJournalPages?(gameId: string): Promise<JournalPage[]> | JournalPage[];
+  createJournalPage?(input: JournalPageCreate): Promise<JournalPage> | JournalPage;
+  saveJournalPage?(draft: JournalPageDraft): Promise<JournalPage> | JournalPage;
+  deleteJournalPage?(pageId: string): Promise<void> | void;
+  getJournalAssets?(gameId: string): Promise<JournalAsset[]> | JournalAsset[];
   getSettings?(): Promise<AppSettings> | AppSettings;
   setSetting?(key: string, value: string): Promise<void> | void;
   saveSettings?(changes: AppSettingsUpdate): Promise<void> | void;
@@ -349,6 +367,31 @@ export function registerLibraryHandlers({ ipcMain, library, appearanceAuthorizat
   ipcMain.handle(IPC_LIBRARY_BULK_UPDATE_TRACKS, async (_event, ...args) => {
     assertArgumentCount(args, 1, IPC_LIBRARY_BULK_UPDATE_TRACKS);
     return await serviceMethod(library, 'bulkUpdateTracks')(validateBulkTrackRequest(args[0]));
+  });
+
+  ipcMain.handle(IPC_LIBRARY_GET_JOURNAL_PAGES, async (_event, ...args) => {
+    assertArgumentCount(args, 1, IPC_LIBRARY_GET_JOURNAL_PAGES);
+    return await serviceMethod(library, 'getJournalPages')(validateGameId(args[0]));
+  });
+
+  ipcMain.handle(IPC_LIBRARY_CREATE_JOURNAL_PAGE, async (_event, ...args) => {
+    assertArgumentCount(args, 1, IPC_LIBRARY_CREATE_JOURNAL_PAGE);
+    return await serviceMethod(library, 'createJournalPage')(validateJournalPageCreate(args[0]));
+  });
+
+  ipcMain.handle(IPC_LIBRARY_SAVE_JOURNAL_PAGE, async (_event, ...args) => {
+    assertArgumentCount(args, 1, IPC_LIBRARY_SAVE_JOURNAL_PAGE);
+    return await serviceMethod(library, 'saveJournalPage')(validateJournalPageDraft(args[0]));
+  });
+
+  ipcMain.handle(IPC_LIBRARY_DELETE_JOURNAL_PAGE, async (_event, ...args) => {
+    assertArgumentCount(args, 1, IPC_LIBRARY_DELETE_JOURNAL_PAGE);
+    return await serviceMethod(library, 'deleteJournalPage')(validateStringId(args[0], 'pageId'));
+  });
+
+  ipcMain.handle(IPC_LIBRARY_GET_JOURNAL_ASSETS, async (_event, ...args) => {
+    assertArgumentCount(args, 1, IPC_LIBRARY_GET_JOURNAL_ASSETS);
+    return await serviceMethod(library, 'getJournalAssets')(validateGameId(args[0]));
   });
 
   ipcMain.handle(IPC_APP_GET_SETTINGS, async (_event, ...args) => {

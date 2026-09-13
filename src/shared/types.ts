@@ -47,6 +47,11 @@ export interface GameMetadataSourceSummary {
   summary: string | null;
   score: number | null;
   rank: number | null;
+  releaseDate?: string | null;
+  languages?: string[];
+  platforms?: string[];
+  tags?: string[];
+  sourceUrl?: string | null;
   fetchedAt: string | null;
   errorMessage: string | null;
 }
@@ -118,6 +123,127 @@ export interface GameUpdate {
   name?: string;
   coverPath?: string | null;
 }
+
+/** Managed media kinds that can be placed on a scrapbook page. */
+export type JournalAssetKind = 'image' | 'video';
+
+export type JournalPaperPattern = 'plain' | 'grid' | 'dots' | 'paper';
+
+export interface JournalPageBackground {
+  color: string;
+  pattern: JournalPaperPattern;
+}
+
+export interface JournalBlockFrame {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  zIndex: number;
+  locked: boolean;
+}
+
+export interface JournalTextBlock extends JournalBlockFrame {
+  type: 'text';
+  text: string;
+  color: string;
+  backgroundColor: string;
+  fontSize: number;
+  align: 'left' | 'center' | 'right';
+}
+
+export interface JournalQuoteBlock extends JournalBlockFrame {
+  type: 'quote';
+  quote: string;
+  attribution: string;
+  accentColor: string;
+}
+
+export interface JournalMediaBlock extends JournalBlockFrame {
+  type: 'image' | 'video';
+  assetId: string;
+  caption: string;
+}
+
+export interface JournalTrackBlock extends JournalBlockFrame {
+  type: 'track';
+  trackId: string;
+  startTime: number | null;
+  note: string;
+}
+
+export interface JournalDetailsBlock extends JournalBlockFrame {
+  type: 'details';
+  source: MetadataSource | 'auto';
+}
+
+export type JournalBlock =
+  | JournalTextBlock
+  | JournalQuoteBlock
+  | JournalMediaBlock
+  | JournalTrackBlock
+  | JournalDetailsBlock;
+
+/** A managed image or video copied below the owning game's scrapbook folder. */
+export interface JournalAsset {
+  id: string;
+  gameId: string;
+  kind: JournalAssetKind;
+  filePath: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  fileHash: string;
+  createdAt: string;
+}
+
+/** One ordered, independently persisted page in a game's scrapbook. */
+export interface JournalPage {
+  id: string;
+  gameId: string;
+  title: string;
+  position: number;
+  canvasWidth: number;
+  canvasHeight: number;
+  background: JournalPageBackground;
+  blocks: JournalBlock[];
+  tags: string[];
+  soundtrackTrackId: string | null;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JournalPageCreate {
+  id: string;
+  gameId: string;
+  title: string;
+  canvasWidth: number;
+  canvasHeight: number;
+  background?: JournalPageBackground;
+  blocks?: JournalBlock[];
+  tags?: string[];
+  soundtrackTrackId?: string | null;
+}
+
+export type JournalPageDraft = Pick<
+  JournalPage,
+  | 'id'
+  | 'gameId'
+  | 'title'
+  | 'position'
+  | 'canvasWidth'
+  | 'canvasHeight'
+  | 'background'
+  | 'blocks'
+  | 'tags'
+  | 'soundtrackTrackId'
+  | 'revision'
+>;
+
+export type JournalAssetCreate = Omit<JournalAsset, 'createdAt'>;
 
 /** Progress emitted while scanning, extracting, or copying an import. */
 export interface ScanProgress {

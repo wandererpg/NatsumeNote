@@ -29,12 +29,14 @@ function statusLabel(status: MetadataStatus): string {
     matched: '已匹配',
     no_match: '无结果',
     failed: '查询失败',
-    ambiguous: '待确认',
+    ambiguous: '匹配不确定',
   }[status];
 }
 
 function hasMatchedSummary(source: GameMetadataSourceSummary): boolean {
-  return source.status === 'matched' && Boolean(source.title || source.titleCn || source.developer || source.summary);
+  return source.status === 'matched' && Boolean(
+    source.title || source.titleCn || source.developer || source.summary || source.releaseDate || source.tags?.length,
+  );
 }
 
 function coverStatusLabel(metadata: GameMetadataSummary): string {
@@ -153,7 +155,7 @@ export function GameEditor({ game, onClose, onSelectImage, onSave, metadata, onR
               <header className="game-editor__metadata-header">
                 <div>
                   <span className="settings-field__label" id="game-editor-metadata-title">网络资料</span>
-                  <small>按游戏库缓存 VNDB 与 Bangumi 的匹配结果</small>
+                  <small>导入音乐后自动抓取并缓存 VNDB 与 Bangumi 资料</small>
                 </div>
                 <button className="button button--ghost button--small" type="button" aria-label="刷新网络资料" onClick={() => void refreshMetadata()} disabled={isRefreshingMetadata}>
                   {isRefreshingMetadata ? <LoaderCircle className="spin" size={14} aria-hidden="true" /> : <RefreshCw size={14} aria-hidden="true" />}
@@ -173,8 +175,19 @@ export function GameEditor({ game, onClose, onSelectImage, onSave, metadata, onR
                         <strong>{source.titleCn || source.title}</strong>
                         {source.titleCn && source.title && source.titleCn !== source.title && <small>{source.title}</small>}
                         {source.developer && <span>开发商：{source.developer}</span>}
+                        {source.releaseDate && <span>发行日期：{source.releaseDate}</span>}
+                        {source.platforms && source.platforms.length > 0 && <span>平台：{source.platforms.join('、')}</span>}
+                        {source.languages && source.languages.length > 0 && <span>语言：{source.languages.join('、')}</span>}
                         {source.score !== null && <span>评分：{source.score.toFixed(1)}{source.rank !== null ? ` · 排名 ${source.rank}` : ''}</span>}
+                        {source.tags && source.tags.length > 0 && (
+                          <div className="game-editor__metadata-tags" aria-label="作品标签">
+                            {source.tags.map((tag) => <span key={tag}>{tag}</span>)}
+                          </div>
+                        )}
                         {source.summary && <p>{source.summary}</p>}
+                        {source.sourceUrl && (
+                          <a href={source.sourceUrl} target="_blank" rel="noreferrer">查看 {sourceLabel(source.source)} 条目</a>
+                        )}
                       </div>
                     ) : source.errorMessage ? (
                       <p className="game-editor__metadata-empty">{source.errorMessage}</p>

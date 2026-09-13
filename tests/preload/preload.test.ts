@@ -6,10 +6,19 @@ vi.mock('electron', () => ({
 }));
 
 import { createGalMusicApi, type IpcRendererLike } from '../../src/preload';
-import { IPC_LIBRARY_BULK_UPDATE_TRACKS, IPC_LIBRARY_GET_GAME_METADATA, IPC_LIBRARY_REFRESH_GAME_METADATA } from '../../src/shared/ipc';
+import { IPC_JOURNAL_SELECT_MEDIA, IPC_LIBRARY_BULK_UPDATE_TRACKS, IPC_LIBRARY_GET_GAME_METADATA, IPC_LIBRARY_REFRESH_GAME_METADATA } from '../../src/shared/ipc';
 import type { BulkTrackRequest } from '../../src/shared/types';
 
 describe('preload bridge', () => {
+  it('exposes the allow-listed scrapbook media picker', async () => {
+    const assets = [{ id: 'asset-1', kind: 'image' }];
+    const ipc: IpcRendererLike = { invoke: vi.fn().mockResolvedValue(assets), on: vi.fn() };
+    const api = createGalMusicApi(ipc);
+
+    await expect(api.selectJournalMedia?.('g1', 'image')).resolves.toEqual(assets);
+    expect(ipc.invoke).toHaveBeenCalledWith(IPC_JOURNAL_SELECT_MEDIA, 'g1', 'image');
+  });
+
   it('exposes bulk track updates as one allow-listed IPC invocation', async () => {
     const request: BulkTrackRequest = {
       sourceGameId: 'g1',

@@ -87,10 +87,10 @@ describe('renderer shell', () => {
     expect(screen.getByRole('button', { name: /导入游戏音乐/i })).toBeInTheDocument();
   });
 
-  it('shows NatsumeMusic as the visible application name', async () => {
+  it('shows NatsumeNote as the visible application name', async () => {
     render(<App />);
 
-    expect(await screen.findByText('NatsumeMusic')).toBeInTheDocument();
+    expect(await screen.findByText('NatsumeNote')).toBeInTheDocument();
     expect(screen.queryByText('GalMusic')).not.toBeInTheDocument();
   });
 

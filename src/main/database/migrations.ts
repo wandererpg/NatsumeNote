@@ -5,7 +5,7 @@ import type Database from 'better-sqlite3';
  * small migrations table.  Keeping both makes the database easy to inspect
  * and gives us a place to add non-destructive migrations in future releases.
  */
-export const LATEST_SCHEMA_VERSION = 5;
+export const LATEST_SCHEMA_VERSION = 6;
 
 type SQLiteDatabase = Database.Database;
 
@@ -137,6 +137,49 @@ export function migrate(db: SQLiteDatabase): void {
         );
       `);
       db.prepare('INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)').run(5);
+    }
+
+    if (userVersion < 6) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS journal_pages (
+          id                    TEXT PRIMARY KEY,
+          game_id               TEXT NOT NULL,
+          title                 TEXT NOT NULL,
+          position              INTEGER NOT NULL DEFAULT 0,
+          canvas_width          INTEGER NOT NULL DEFAULT 1440,
+          canvas_height         INTEGER NOT NULL DEFAULT 1000,
+          background_json       TEXT NOT NULL DEFAULT '{"color":"#fffaf0","pattern":"paper"}',
+          blocks_json           TEXT NOT NULL DEFAULT '[]',
+          tags_json             TEXT NOT NULL DEFAULT '[]',
+          soundtrack_track_id   TEXT,
+          revision              INTEGER NOT NULL DEFAULT 0,
+          created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
+          FOREIGN KEY (soundtrack_track_id) REFERENCES tracks(id) ON DELETE SET NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_journal_pages_game_position
+          ON journal_pages(game_id, position, created_at);
+
+        CREATE TABLE IF NOT EXISTS journal_assets (
+          id          TEXT PRIMARY KEY,
+          game_id     TEXT NOT NULL,
+          kind        TEXT NOT NULL CHECK (kind IN ('image', 'video')),
+          file_path   TEXT NOT NULL,
+          file_name   TEXT NOT NULL,
+          mime_type   TEXT NOT NULL,
+          file_size   INTEGER NOT NULL,
+          file_hash   TEXT NOT NULL,
+          created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
+          UNIQUE (game_id, file_hash)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_journal_assets_game_created
+          ON journal_assets(game_id, created_at);
+      `);
+      db.prepare('INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)').run(6);
     }
 
     db.pragma(`user_version = ${LATEST_SCHEMA_VERSION}`);

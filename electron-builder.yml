@@ -1,5 +1,5 @@
-appId: com.galmusic.app
-productName: NatsumeMusic
+appId: com.natsumenote.app
+productName: NatsumeNote
 artifactName: ${productName}-${version}-${arch}.${ext}
 
 directories:
@@ -34,7 +34,7 @@ win:
     - target: nsis
       arch:
         - x64
-  executableName: NatsumeMusic
+  executableName: NatsumeNote
 
 nsis:
   installerIcon: build/icon.ico
@@ -44,4 +44,4 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: NatsumeMusic
+  shortcutName: NatsumeNote

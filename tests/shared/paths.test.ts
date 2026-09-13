@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { assertWithin, defaultLibraryPath, sanitizeDirectoryName } from '../../src/shared/paths';
 
 describe('path safety', () => {
-  it('uses Music/NatsumeMusic as the default library', () => {
-    expect(defaultLibraryPath('C:/Users/Ada')).toBe('C:/Users/Ada/Music/NatsumeMusic');
+  it('uses Music/NatsumeNote as the default library', () => {
+    expect(defaultLibraryPath('C:/Users/Ada')).toBe('C:/Users/Ada/Music/NatsumeNote');
   });
 
   it('rejects a path outside the allowed root', () => {

@@ -23,7 +23,7 @@ describe('resource verification', () => {
     await writeFile(path.join(root, 'tools', 'extract-rpa.mjs'), '// fixture');
 
     const { stdout } = await execFileAsync(process.execPath, [scriptPath, '--root', root]);
-    expect(stdout).toContain('NatsumeMusic resources verified');
+    expect(stdout).toContain('NatsumeNote resources verified');
   });
 
   it('rejects a GARbro bundle without the non-interactive XP3 bridge', async () => {
