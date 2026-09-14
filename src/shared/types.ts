@@ -51,6 +51,26 @@ export interface GameMetadataCandidateSummary {
   sourceUrl: string;
 }
 
+export interface GameMetadataCharacterSummary {
+  externalId: string;
+  name: string;
+  originalName: string | null;
+  role: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  voiceActors: string[];
+  sourceUrl: string;
+}
+
+export interface GameMetadataStaffSummary {
+  externalId: string;
+  name: string;
+  originalName: string | null;
+  role: string;
+  imageUrl: string | null;
+  sourceUrl: string;
+}
+
 /** Sanitized source summary safe to send to the renderer. */
 export interface GameMetadataSourceSummary {
   source: MetadataSource;
@@ -72,6 +92,9 @@ export interface GameMetadataSourceSummary {
   sourceUrl?: string | null;
   /** Ranked, sanitized candidates retained for explicit user confirmation. */
   candidates?: GameMetadataCandidateSummary[];
+  characters?: GameMetadataCharacterSummary[];
+  staff?: GameMetadataStaffSummary[];
+  creditsError?: string | null;
   fetchedAt: string | null;
   errorMessage: string | null;
 }

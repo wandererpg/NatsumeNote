@@ -3,6 +3,7 @@ import { CalendarDays, ExternalLink, Gamepad2, Languages, LibraryBig, Sparkles, 
 import { toCoverUrl } from '../../../../shared/cover-url';
 import type { Game, GameMetadataSourceSummary, GameMetadataSummary, MetadataSource } from '../../../../shared/types';
 import { SummaryReader } from './SummaryReader';
+import { GameArchiveDetails } from './GameArchiveDetails';
 
 export interface GameOverviewProps {
   game: Game;
@@ -19,8 +20,17 @@ function bestSource(metadata: GameMetadataSummary | null): GameMetadataSourceSum
     ?? null;
 }
 
+function bestCreditsSource(metadata: GameMetadataSummary | null): GameMetadataSourceSummary | null {
+  if (!metadata) return null;
+  return metadata.sources
+    .filter((source) => source.status === 'matched' && ((source.characters?.length ?? 0) > 0 || (source.staff?.length ?? 0) > 0))
+    .sort((left, right) => ((right.characters?.length ?? 0) * 2 + (right.staff?.length ?? 0)) - ((left.characters?.length ?? 0) * 2 + (left.staff?.length ?? 0)))[0]
+    ?? null;
+}
+
 export function GameOverview({ game, metadata, loading = false, onEdit, onTranslateSummary }: GameOverviewProps) {
   const source = bestSource(metadata);
+  const creditsSource = bestCreditsSource(metadata);
 
   return (
     <section className="game-overview" aria-labelledby="game-overview-heading">
@@ -60,6 +70,7 @@ export function GameOverview({ game, metadata, loading = false, onEdit, onTransl
         {source?.score !== null && source?.score !== undefined && <div><Star size={17} aria-hidden="true" /><span>资料评分<strong>{source.score.toFixed(1)}{source.rank !== null ? ` · #${source.rank}` : ''}</strong></span></div>}
         {source?.sourceUrl && <a href={source.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />在 {source.source === 'vndb' ? 'VNDB' : 'Bangumi'} 查看</a>}
       </aside>
+      {creditsSource && <GameArchiveDetails source={creditsSource} />}
     </section>
   );
 }

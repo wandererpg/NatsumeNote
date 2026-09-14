@@ -5,10 +5,11 @@ import path from 'node:path';
 import { getGame, setGameCover } from '../database/queries/games';
 import { getGameSource, getGameSources, upsertGameSource, type GameSourceInput, type GameSourceRow } from '../database/queries/game-sources';
 import { AppError } from '../../shared/errors';
-import type { CoverSource, GameMetadataCandidateSummary, GameMetadataSourceSummary, GameMetadataSummary, MetadataSource, MetadataStatus } from '../../shared/types';
+import type { CoverSource, GameMetadataCandidateSummary, GameMetadataCharacterSummary, GameMetadataSourceSummary, GameMetadataStaffSummary, GameMetadataSummary, MetadataSource, MetadataStatus } from '../../shared/types';
 import { assertWithin, sanitizeDirectoryName } from '../../shared/paths';
 import { downloadCover, type CoverHttpClient } from './cover-download';
 import { translateSummaryToChinese } from './summary-translation';
+import { fetchMetadataCredits } from './metadata-credits';
 
 export interface MetadataHttpResponse {
   ok: boolean;
@@ -46,6 +47,8 @@ export interface NormalizedMetadataCandidate {
   tags: string[];
   imageUrl: string | null;
   sourceUrl: string;
+  characters: GameMetadataCharacterSummary[];
+  staff: GameMetadataStaffSummary[];
 }
 
 export interface CandidateResolution {
@@ -128,6 +131,7 @@ export function summarizeCandidate(
   errorMessage: string | null,
   candidates: NormalizedMetadataCandidate[] = [],
   summaryZhCn: string | null = null,
+  creditsError: string | null = null,
 ): GameMetadataSourceSummary {
   return {
     source,
@@ -147,6 +151,9 @@ export function summarizeCandidate(
     tags: matched?.tags ?? [],
     sourceUrl: matched?.sourceUrl ?? null,
     candidates: candidates.map(toCandidateSummary),
+    characters: matched?.characters ?? [],
+    staff: matched?.staff ?? [],
+    creditsError,
     fetchedAt,
     errorMessage,
   };
@@ -301,6 +308,8 @@ function vndbCandidate(value: unknown): NormalizedMetadataCandidate | null {
     tags: vndbTags(row.tags),
     imageUrl: httpsImage(image.url),
     sourceUrl: sourceUrl('vndb', externalId),
+    characters: [],
+    staff: [],
   };
 }
 
@@ -365,6 +374,8 @@ function bangumiCandidate(search: Record<string, unknown>, detail: Record<string
     tags: bangumiTags(detail, search),
     imageUrl,
     sourceUrl: sourceUrl('bangumi', externalId),
+    characters: [],
+    staff: [],
   };
 }
 
@@ -437,21 +448,30 @@ function isAbortError(error: unknown, signal: AbortSignal): boolean {
 }
 
 function sourceData(resolution: CandidateResolution, summaryZhCn: string | null = null): string {
-  return JSON.stringify({ matched: resolution.matched, candidates: resolution.candidates, summaryZhCn });
+  return JSON.stringify({ matched: resolution.matched, candidates: resolution.candidates, summaryZhCn, creditsLoaded: false, creditsError: null });
 }
 
-function parseSourceData(row: GameSourceRow): { matched: NormalizedMetadataCandidate | null; candidates: NormalizedMetadataCandidate[]; summaryZhCn: string | null } {
-  if (!row.dataJson) return { matched: null, candidates: [], summaryZhCn: null };
+interface StoredSourceData {
+  matched: NormalizedMetadataCandidate | null;
+  candidates: NormalizedMetadataCandidate[];
+  summaryZhCn: string | null;
+  creditsLoaded: boolean;
+  creditsError: string | null;
+}
+
+function parseSourceData(row: GameSourceRow): StoredSourceData {
+  if (!row.dataJson) return { matched: null, candidates: [], summaryZhCn: null, creditsLoaded: false, creditsError: null };
   try {
-    const data = JSON.parse(row.dataJson) as { matched?: unknown; candidates?: unknown; summaryZhCn?: unknown };
+    const data = JSON.parse(row.dataJson) as { matched?: unknown; candidates?: unknown; summaryZhCn?: unknown; creditsLoaded?: unknown; creditsError?: unknown };
     const matched = data.matched && typeof data.matched === 'object' ? data.matched as NormalizedMetadataCandidate : null;
     const candidates = Array.isArray(data.candidates)
       ? data.candidates.filter((item): item is NormalizedMetadataCandidate => typeof item === 'object' && item !== null)
       : [];
     const summaryZhCn = typeof data.summaryZhCn === 'string' && data.summaryZhCn.trim() ? data.summaryZhCn.trim() : null;
-    return { matched, candidates, summaryZhCn };
+    const creditsError = typeof data.creditsError === 'string' && data.creditsError.trim() ? data.creditsError.trim() : null;
+    return { matched, candidates, summaryZhCn, creditsLoaded: data.creditsLoaded === true, creditsError };
   } catch {
-    return { matched: null, candidates: [], summaryZhCn: null };
+    return { matched: null, candidates: [], summaryZhCn: null, creditsLoaded: false, creditsError: null };
   }
 }
 
@@ -461,7 +481,7 @@ function emptySummary(source: MetadataSource, queryName: string): GameMetadataSo
 
 function toSummary(row: GameSourceRow, queryName: string): GameMetadataSourceSummary {
   const data = parseSourceData(row);
-  return summarizeCandidate(row.source, row.queryName || queryName, row.status === 'matched' ? 'matched' : row.status, data.matched, row.fetchedAt, row.errorMessage, data.candidates, data.summaryZhCn);
+  return summarizeCandidate(row.source, row.queryName || queryName, row.status === 'matched' ? 'matched' : row.status, data.matched, row.fetchedAt, row.errorMessage, data.candidates, data.summaryZhCn, data.creditsError);
 }
 
 function nowIso(now: () => Date): string {
@@ -517,6 +537,7 @@ export interface GameMetadataServiceOptions {
   now?: () => Date;
   download?: typeof downloadCover;
   translate?: (text: string, signal: AbortSignal) => Promise<string>;
+  loadCredits?: typeof fetchMetadataCredits;
 }
 
 function sourceInput(
@@ -545,6 +566,27 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
   const now = options.now ?? (() => new Date());
   const download = options.download ?? downloadCover;
   const translate = options.translate ?? translateSummaryToChinese;
+  const loadCredits = options.loadCredits ?? fetchMetadataCredits;
+
+  const enrichSourceRow = async (row: GameSourceRow, signal: AbortSignal, parentSignal = signal): Promise<GameSourceRow> => {
+    const stored = parseSourceData(row);
+    if (row.status !== 'matched' || !stored.matched || stored.creditsLoaded) return row;
+    try {
+      const credits = await loadCredits(row.source, stored.matched.externalId, signal, http);
+      const matched = { ...stored.matched, ...credits };
+      const candidates = stored.candidates.map((candidate) => candidate.externalId === matched.externalId ? matched : candidate);
+      return upsertGameSource(options.db, {
+        ...row,
+        dataJson: JSON.stringify({ ...stored, matched, candidates, creditsLoaded: true, creditsError: null }),
+      });
+    } catch (error) {
+      if (parentSignal.aborted) throw error;
+      return upsertGameSource(options.db, {
+        ...row,
+        dataJson: JSON.stringify({ ...stored, creditsLoaded: true, creditsError: error instanceof Error ? error.message : String(error) }),
+      });
+    }
+  };
 
   const getSummary = (gameId: string): GameMetadataSummary => {
     const game = getGame(options.db, gameId);
@@ -605,6 +647,15 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
       }
     }));
 
+    await Promise.all(getGameSources(options.db, gameId).map(async (row) => {
+      const timeout = childTimeout(request.signal, REQUEST_TIMEOUT_MS);
+      try {
+        await enrichSourceRow(row, timeout.signal, request.signal);
+      } finally {
+        timeout.dispose();
+      }
+    }));
+
     const refreshedGame = getGame(options.db, gameId)!;
     const refreshedRows = getGameSources(options.db, gameId);
     const preferred = (['vndb', 'bangumi'] as MetadataSource[])
@@ -657,15 +708,20 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
     const game = getGame(options.db, gameId);
     if (!game) throw new AppError('FILE_NOT_FOUND', `Game not found: ${gameId}`, '找不到指定的游戏。');
     const row = getGameSource(options.db, gameId, source);
-    const stored = row ? parseSourceData(row) : { matched: null, candidates: [], summaryZhCn: null };
+    const stored = row ? parseSourceData(row) : { matched: null, candidates: [], summaryZhCn: null, creditsLoaded: false, creditsError: null };
     const selected = stored.candidates.find((candidate) => candidate.externalId === externalId);
     if (!row || !selected) {
       throw new AppError('FILE_NOT_FOUND', `Metadata candidate not found: ${source}/${externalId}`, '候选资料已失效，请重新搜索。');
     }
 
     const resolution: CandidateResolution = { status: 'matched', matched: selected, candidates: stored.candidates };
-    const selectedRow = sourceInput(gameId, source, row.queryName || game.name, resolution, row.fetchedAt ?? nowIso(now));
-    upsertGameSource(options.db, selectedRow);
+    let selectedRow = upsertGameSource(options.db, sourceInput(gameId, source, row.queryName || game.name, resolution, row.fetchedAt ?? nowIso(now)));
+    const creditsTimeout = childTimeout(signal, REQUEST_TIMEOUT_MS);
+    try {
+      selectedRow = await enrichSourceRow(selectedRow, creditsTimeout.signal, signal);
+    } finally {
+      creditsTimeout.dispose();
+    }
 
     if (selected.imageUrl && game.coverSource !== 'manual') {
       const libraryPathValue = await options.getLibraryPath();

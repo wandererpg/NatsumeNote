@@ -34,6 +34,8 @@ function candidate(overrides: Partial<NormalizedMetadataCandidate> = {}): Normal
     tags: [],
     imageUrl: null,
     sourceUrl: 'https://example.invalid/v1',
+    characters: [],
+    staff: [],
     ...overrides,
   };
 }
@@ -312,6 +314,7 @@ describe('metadata migration fixture', () => {
     const service = createGameMetadataService({
       db,
       getLibraryPath: () => library,
+      loadCredits: async () => ({ characters: [], staff: [] }),
       download: async (url) => {
         downloaded.push(url);
         const target = path.join(gameDirectory, '.cover.jpg');
@@ -361,6 +364,45 @@ describe('metadata migration fixture', () => {
       expect(cached.sources[0].summaryZhCn).toBe('一个关于大海与难忘夏日的故事。');
       expect(translate).toHaveBeenCalledOnce();
       expect(translate).toHaveBeenCalledWith(matched.summary, expect.any(AbortSignal));
+    } finally {
+      db.close();
+    }
+  });
+
+  it('enriches an existing matched source with characters and staff only once', async () => {
+    const db = new Database(':memory:');
+    migrate(db);
+    createGame(db, { id: 'g1', name: 'ATRI' });
+    const matched = candidate({ externalId: 'v17', summary: 'A story.' });
+    upsertGameSource(db, {
+      gameId: 'g1', source: 'vndb', externalId: 'v17', queryName: 'ATRI', status: 'matched',
+      dataJson: JSON.stringify({ matched, candidates: [matched] }), imageUrl: null,
+      fetchedAt: '2026-09-14T00:00:00.000Z', retryAfter: null, errorMessage: null,
+    });
+    upsertGameSource(db, {
+      gameId: 'g1', source: 'bangumi', externalId: null, queryName: 'ATRI', status: 'no_match',
+      dataJson: JSON.stringify({ matched: null, candidates: [] }), imageUrl: null,
+      fetchedAt: '2026-09-14T00:00:00.000Z', retryAfter: null, errorMessage: null,
+    });
+    const loadCredits = vi.fn().mockResolvedValue({
+      characters: [{
+        externalId: 'c1', name: 'Atri', originalName: 'アトリ', role: 'main', description: 'A mechanical girl.',
+        imageUrl: 'https://img.example/atri.jpg', voiceActors: ['Hikaru Akao'], sourceUrl: 'https://vndb.org/c1',
+      }],
+      staff: [{
+        externalId: 's1', name: 'Asuta Konno', originalName: '紺野アスタ', role: 'scenario', imageUrl: null, sourceUrl: 'https://vndb.org/s1',
+      }],
+    });
+    const service = createGameMetadataService({ db, getLibraryPath: () => 'C:/Music', loadCredits });
+
+    try {
+      const enriched = await service.ensure('g1', { signal: new AbortController().signal });
+      await service.ensure('g1', { signal: new AbortController().signal });
+
+      expect(enriched.sources[0].characters).toEqual([expect.objectContaining({ name: 'Atri', role: 'main' })]);
+      expect(enriched.sources[0].staff).toEqual([expect.objectContaining({ name: 'Asuta Konno', role: 'scenario' })]);
+      expect(loadCredits).toHaveBeenCalledOnce();
+      expect(loadCredits).toHaveBeenCalledWith('vndb', 'v17', expect.any(AbortSignal), expect.any(Object));
     } finally {
       db.close();
     }

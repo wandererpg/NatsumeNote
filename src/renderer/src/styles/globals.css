@@ -1241,6 +1241,39 @@ button:not(:disabled) {
 .game-overview__facts span { display: flex; min-width: 0; flex-direction: column; gap: 4px; color: var(--muted-1); font-size: 9px; }
 .game-overview__facts strong { overflow-wrap: anywhere; color: var(--paper-0); font-size: 11px; font-weight: 650; line-height: 1.45; }
 .game-overview__facts a { display: inline-flex; align-items: center; gap: 7px; margin-top: 18px; color: var(--teal-0); font-size: 10px; text-decoration: none; }
+.game-archive-details { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 2fr) minmax(250px, .72fr); gap: clamp(22px, 3vw, 42px); margin-top: 8px; padding-top: 28px; border-top: 1px solid var(--line-strong); }
+.game-archive-details__characters, .game-archive-details__staff { min-width: 0; }
+.game-archive-details__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.game-archive-details__heading > div { display: flex; align-items: center; gap: 7px; color: var(--teal-0); }
+.game-archive-details__heading h3 { margin: 0; color: var(--paper-0); font-size: 13px; letter-spacing: .02em; }
+.game-archive-details__heading > span { color: var(--muted-1); font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
+.character-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(225px, 1fr)); gap: 10px; }
+.character-card { display: grid; min-width: 0; min-height: 142px; grid-template-columns: 92px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: color-mix(in srgb, var(--panel-soft) 74%, transparent); transition: border-color 160ms ease, transform 160ms ease; }
+.character-card:hover { border-color: color-mix(in srgb, var(--teal-0) 34%, var(--line)); transform: translateY(-2px); }
+.character-card__portrait { position: relative; display: grid; min-height: 142px; place-items: center; overflow: hidden; color: color-mix(in srgb, var(--teal-0) 68%, transparent); background: radial-gradient(circle at 50% 34%, color-mix(in srgb, var(--teal-0) 15%, transparent), transparent 58%), var(--ink-2); font-size: 21px; font-weight: 800; text-decoration: none; }
+.character-card__portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
+.character-card__portrait > svg { position: absolute; right: 6px; bottom: 6px; z-index: 1; padding: 4px; border-radius: 5px; color: #fff; background: rgba(3, 10, 14, .66); box-sizing: content-box; opacity: 0; transition: opacity 150ms ease; }
+.character-card:hover .character-card__portrait > svg, .character-card__portrait:focus-visible > svg { opacity: 1; }
+.character-card__copy { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; padding: 12px; }
+.character-card__role { padding: 3px 6px; border: 1px solid color-mix(in srgb, var(--teal-0) 28%, var(--line)); border-radius: 999px; color: var(--teal-0); background: color-mix(in srgb, var(--teal-0) 7%, transparent); font-size: 8px; }
+.character-card__copy h4 { overflow: hidden; width: 100%; margin: 8px 0 0; color: var(--paper-0); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.character-card__copy > small { overflow: hidden; width: 100%; margin-top: 2px; color: var(--muted-1); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.character-card__voice { display: flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--teal-1); font-size: 8px; }
+.character-card__copy p { display: -webkit-box; overflow: hidden; margin: 7px 0 0; color: var(--muted-0); font-size: 9px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.game-archive-details__staff { padding-left: 22px; border-left: 1px solid var(--line); }
+.staff-list { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.staff-list li { min-width: 0; }
+.staff-list a { display: grid; min-width: 0; grid-template-columns: 34px minmax(0, 1fr) 12px; align-items: center; gap: 9px; padding: 7px; border-radius: 8px; color: inherit; text-decoration: none; transition: background 150ms ease; }
+.staff-list a:hover, .staff-list a:focus-visible { background: color-mix(in srgb, var(--teal-0) 8%, transparent); }
+.staff-list__avatar { position: relative; display: grid; width: 34px; height: 34px; place-items: center; overflow: hidden; border: 1px solid var(--line); border-radius: 50%; color: var(--teal-0); background: var(--ink-2); font-size: 10px; font-weight: 750; }
+.staff-list__avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.staff-list__copy { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.staff-list__copy small { color: var(--teal-0); font-size: 8px; }
+.staff-list__copy strong, .staff-list__copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.staff-list__copy strong { color: var(--paper-0); font-size: 10px; font-weight: 650; }
+.staff-list__copy > span { color: var(--muted-1); font-size: 8px; }
+.staff-list a > svg { color: var(--muted-1); opacity: 0; }
+.staff-list a:hover > svg, .staff-list a:focus-visible > svg { opacity: 1; }
 @keyframes poster-arrive { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
 @keyframes room-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
 @media (max-width: 1100px) {
@@ -1248,4 +1281,11 @@ button:not(:disabled) {
   .game-overview { grid-template-columns: 190px minmax(0, 1fr); }
   .game-overview__facts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); padding: 20px 0 0; border-top: 1px solid var(--line); border-left: 0; }
   .game-overview__facts > div { padding: 12px; border-bottom: 0; }
+  .game-archive-details { grid-template-columns: minmax(0, 1.6fr) minmax(230px, .7fr); }
+  .character-card-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+}
+@media (max-width: 800px) {
+  .game-archive-details { grid-template-columns: 1fr; }
+  .game-archive-details__staff { padding: 20px 0 0; border-top: 1px solid var(--line); border-left: 0; }
+  .staff-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

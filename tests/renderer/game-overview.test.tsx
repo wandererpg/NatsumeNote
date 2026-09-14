@@ -64,4 +64,28 @@ describe('GameOverview summary translation', () => {
     expect(screen.getByText('这是一段已经是中文的作品简介。')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '翻译为中文' })).not.toBeInTheDocument();
   });
+
+  it('fills the archive with main character cards and a production staff panel', () => {
+    const richMetadata: GameMetadataSummary = {
+      ...metadata,
+      sources: [{
+        ...metadata.sources[0],
+        characters: [{
+          externalId: 'c1', name: 'Atri', originalName: 'アトリ', role: 'main', description: 'A mechanical girl.',
+          imageUrl: 'https://img.example/atri.jpg', voiceActors: ['Hikaru Akao'], sourceUrl: 'https://vndb.org/c1',
+        }],
+        staff: [{
+          externalId: 's1', name: 'Asuta Konno', originalName: '紺野アスタ', role: 'scenario', imageUrl: null, sourceUrl: 'https://vndb.org/s1',
+        }],
+      }],
+    };
+    render(<GameOverview game={game} metadata={richMetadata} onEdit={vi.fn()} />);
+
+    expect(screen.getByRole('heading', { name: '主要人物' })).toBeInTheDocument();
+    expect(screen.getByText('Atri')).toBeInTheDocument();
+    expect(screen.getByText('声优 · Hikaru Akao')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '主创团队' })).toBeInTheDocument();
+    expect(screen.getByText('Asuta Konno')).toBeInTheDocument();
+    expect(screen.getByText('剧本')).toBeInTheDocument();
+  });
 });
