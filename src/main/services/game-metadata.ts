@@ -8,6 +8,7 @@ import { AppError } from '../../shared/errors';
 import type { CoverSource, GameMetadataCandidateSummary, GameMetadataSourceSummary, GameMetadataSummary, MetadataSource, MetadataStatus } from '../../shared/types';
 import { assertWithin, sanitizeDirectoryName } from '../../shared/paths';
 import { downloadCover, type CoverHttpClient } from './cover-download';
+import { translateSummaryToChinese } from './summary-translation';
 
 export interface MetadataHttpResponse {
   ok: boolean;
@@ -126,6 +127,7 @@ export function summarizeCandidate(
   fetchedAt: string | null,
   errorMessage: string | null,
   candidates: NormalizedMetadataCandidate[] = [],
+  summaryZhCn: string | null = null,
 ): GameMetadataSourceSummary {
   return {
     source,
@@ -136,6 +138,7 @@ export function summarizeCandidate(
     titleCn: matched?.titleCn ?? null,
     developer: matched?.developer ?? null,
     summary: matched?.summary ?? null,
+    summaryZhCn,
     score: matched?.score ?? null,
     rank: matched?.rank ?? null,
     releaseDate: matched?.releaseDate ?? null,
@@ -433,21 +436,22 @@ function isAbortError(error: unknown, signal: AbortSignal): boolean {
   return signal.aborted || error instanceof Error && error.name === 'AbortError';
 }
 
-function sourceData(resolution: CandidateResolution): string {
-  return JSON.stringify({ matched: resolution.matched, candidates: resolution.candidates });
+function sourceData(resolution: CandidateResolution, summaryZhCn: string | null = null): string {
+  return JSON.stringify({ matched: resolution.matched, candidates: resolution.candidates, summaryZhCn });
 }
 
-function parseSourceData(row: GameSourceRow): { matched: NormalizedMetadataCandidate | null; candidates: NormalizedMetadataCandidate[] } {
-  if (!row.dataJson) return { matched: null, candidates: [] };
+function parseSourceData(row: GameSourceRow): { matched: NormalizedMetadataCandidate | null; candidates: NormalizedMetadataCandidate[]; summaryZhCn: string | null } {
+  if (!row.dataJson) return { matched: null, candidates: [], summaryZhCn: null };
   try {
-    const data = JSON.parse(row.dataJson) as { matched?: unknown; candidates?: unknown };
+    const data = JSON.parse(row.dataJson) as { matched?: unknown; candidates?: unknown; summaryZhCn?: unknown };
     const matched = data.matched && typeof data.matched === 'object' ? data.matched as NormalizedMetadataCandidate : null;
     const candidates = Array.isArray(data.candidates)
       ? data.candidates.filter((item): item is NormalizedMetadataCandidate => typeof item === 'object' && item !== null)
       : [];
-    return { matched, candidates };
+    const summaryZhCn = typeof data.summaryZhCn === 'string' && data.summaryZhCn.trim() ? data.summaryZhCn.trim() : null;
+    return { matched, candidates, summaryZhCn };
   } catch {
-    return { matched: null, candidates: [] };
+    return { matched: null, candidates: [], summaryZhCn: null };
   }
 }
 
@@ -457,7 +461,7 @@ function emptySummary(source: MetadataSource, queryName: string): GameMetadataSo
 
 function toSummary(row: GameSourceRow, queryName: string): GameMetadataSourceSummary {
   const data = parseSourceData(row);
-  return summarizeCandidate(row.source, row.queryName || queryName, row.status === 'matched' ? 'matched' : row.status, data.matched, row.fetchedAt, row.errorMessage, data.candidates);
+  return summarizeCandidate(row.source, row.queryName || queryName, row.status === 'matched' ? 'matched' : row.status, data.matched, row.fetchedAt, row.errorMessage, data.candidates, data.summaryZhCn);
 }
 
 function nowIso(now: () => Date): string {
@@ -503,6 +507,7 @@ export interface GameMetadataService {
   getSummary(gameId: string): GameMetadataSummary;
   refresh(gameId: string, signal?: AbortSignal): Promise<GameMetadataSummary>;
   selectCandidate(gameId: string, source: MetadataSource, externalId: string, signal?: AbortSignal): Promise<GameMetadataSummary>;
+  translateSummary(gameId: string, source: MetadataSource, signal?: AbortSignal): Promise<GameMetadataSummary>;
 }
 
 export interface GameMetadataServiceOptions {
@@ -511,6 +516,7 @@ export interface GameMetadataServiceOptions {
   http?: MetadataHttpClient;
   now?: () => Date;
   download?: typeof downloadCover;
+  translate?: (text: string, signal: AbortSignal) => Promise<string>;
 }
 
 function sourceInput(
@@ -538,6 +544,7 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
   const http = options.http ?? defaultHttpClient();
   const now = options.now ?? (() => new Date());
   const download = options.download ?? downloadCover;
+  const translate = options.translate ?? translateSummaryToChinese;
 
   const getSummary = (gameId: string): GameMetadataSummary => {
     const game = getGame(options.db, gameId);
@@ -650,7 +657,7 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
     const game = getGame(options.db, gameId);
     if (!game) throw new AppError('FILE_NOT_FOUND', `Game not found: ${gameId}`, '找不到指定的游戏。');
     const row = getGameSource(options.db, gameId, source);
-    const stored = row ? parseSourceData(row) : { matched: null, candidates: [] };
+    const stored = row ? parseSourceData(row) : { matched: null, candidates: [], summaryZhCn: null };
     const selected = stored.candidates.find((candidate) => candidate.externalId === externalId);
     if (!row || !selected) {
       throw new AppError('FILE_NOT_FOUND', `Metadata candidate not found: ${source}/${externalId}`, '候选资料已失效，请重新搜索。');
@@ -684,10 +691,34 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
     return getSummary(gameId);
   };
 
+  const translateSummary = async (
+    gameId: string,
+    source: MetadataSource,
+    signal = new AbortController().signal,
+  ): Promise<GameMetadataSummary> => {
+    const row = getGameSource(options.db, gameId, source);
+    if (!row) throw new AppError('FILE_NOT_FOUND', `Metadata source not found: ${gameId}/${source}`, '找不到可翻译的资料来源。');
+    const stored = parseSourceData(row);
+    const original = stored.matched?.summary?.trim();
+    if (row.status !== 'matched' || !original) {
+      throw new AppError('FILE_NOT_FOUND', `Matched summary not found: ${gameId}/${source}`, '该资料来源没有可翻译的简介。');
+    }
+    if (stored.summaryZhCn) return getSummary(gameId);
+
+    const summaryZhCn = (await translate(original, signal)).trim();
+    if (!summaryZhCn) throw new AppError('DB_ERROR', 'Translator returned an empty summary', '翻译服务没有返回有效译文，请稍后重试。');
+    upsertGameSource(options.db, {
+      ...row,
+      dataJson: JSON.stringify({ ...stored, summaryZhCn }),
+    });
+    return getSummary(gameId);
+  };
+
   return {
     ensure,
     getSummary,
     refresh: (gameId, signal = new AbortController().signal) => ensure(gameId, { signal, force: true }),
     selectCandidate,
+    translateSummary,
   };
 }

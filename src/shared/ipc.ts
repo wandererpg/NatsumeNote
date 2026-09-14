@@ -50,6 +50,7 @@ export const LIBRARY_UPDATE_GAME = 'library:update-game' as const;
 export const LIBRARY_GET_GAME_METADATA = 'library:get-game-metadata' as const;
 export const LIBRARY_REFRESH_GAME_METADATA = 'library:refresh-game-metadata' as const;
 export const LIBRARY_SELECT_GAME_METADATA_CANDIDATE = 'library:select-game-metadata-candidate' as const;
+export const LIBRARY_TRANSLATE_GAME_SUMMARY = 'library:translate-game-summary' as const;
 export const LIBRARY_DELETE_GAME = 'library:delete-game' as const;
 export const LIBRARY_BULK_UPDATE_TRACKS = 'library:bulk-update-tracks' as const;
 export const LIBRARY_GET_JOURNAL_PAGES = 'library:get-journal-pages' as const;
@@ -96,6 +97,7 @@ export const IPC_REQUESTS = {
   libraryGetGameMetadata: LIBRARY_GET_GAME_METADATA,
   libraryRefreshGameMetadata: LIBRARY_REFRESH_GAME_METADATA,
   librarySelectGameMetadataCandidate: LIBRARY_SELECT_GAME_METADATA_CANDIDATE,
+  libraryTranslateGameSummary: LIBRARY_TRANSLATE_GAME_SUMMARY,
   libraryDeleteGame: LIBRARY_DELETE_GAME,
   libraryBulkUpdateTracks: LIBRARY_BULK_UPDATE_TRACKS,
   libraryGetJournalPages: LIBRARY_GET_JOURNAL_PAGES,
@@ -154,6 +156,7 @@ export const IPC_LIBRARY_UPDATE_GAME = LIBRARY_UPDATE_GAME;
 export const IPC_LIBRARY_GET_GAME_METADATA = LIBRARY_GET_GAME_METADATA;
 export const IPC_LIBRARY_REFRESH_GAME_METADATA = LIBRARY_REFRESH_GAME_METADATA;
 export const IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE = LIBRARY_SELECT_GAME_METADATA_CANDIDATE;
+export const IPC_LIBRARY_TRANSLATE_GAME_SUMMARY = LIBRARY_TRANSLATE_GAME_SUMMARY;
 export const IPC_LIBRARY_DELETE_GAME = LIBRARY_DELETE_GAME;
 export const IPC_LIBRARY_BULK_UPDATE_TRACKS = LIBRARY_BULK_UPDATE_TRACKS;
 export const IPC_LIBRARY_GET_JOURNAL_PAGES = LIBRARY_GET_JOURNAL_PAGES;
@@ -202,6 +205,7 @@ export interface GalMusicAPI {
   getGameMetadata?: (gameId: string) => Promise<GameMetadataSummary>;
   refreshGameMetadata?: (gameId: string) => Promise<GameMetadataSummary>;
   selectGameMetadataCandidate?: (gameId: string, source: MetadataSource, externalId: string) => Promise<GameMetadataSummary>;
+  translateGameSummary?: (gameId: string, source: MetadataSource) => Promise<GameMetadataSummary>;
   deleteGame?: (gameId: string) => Promise<void>;
   bulkUpdateTracks(request: BulkTrackRequest): Promise<BulkTrackResult>;
   getJournalPages?: (gameId: string) => Promise<JournalPage[]>;

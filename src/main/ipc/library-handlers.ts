@@ -22,6 +22,7 @@ import {
   IPC_LIBRARY_GET_TRACKS,
   IPC_LIBRARY_REFRESH_GAME_METADATA,
   IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE,
+  IPC_LIBRARY_TRANSLATE_GAME_SUMMARY,
   IPC_LIBRARY_REMOVE_TRACK_FROM_PLAYLIST,
   IPC_LIBRARY_SEARCH,
   IPC_LIBRARY_UPDATE_GAME,
@@ -81,6 +82,7 @@ export interface LibraryService {
   getGameMetadata?(gameId: string): Promise<GameMetadataSummary> | GameMetadataSummary;
   refreshGameMetadata?(gameId: string): Promise<GameMetadataSummary> | GameMetadataSummary;
   selectGameMetadataCandidate?(gameId: string, source: MetadataSource, externalId: string): Promise<GameMetadataSummary> | GameMetadataSummary;
+  translateGameSummary?(gameId: string, source: MetadataSource): Promise<GameMetadataSummary> | GameMetadataSummary;
   deleteGame?(gameId: string): Promise<void> | void;
   bulkUpdateTracks?(request: BulkTrackRequest): Promise<BulkTrackResult> | BulkTrackResult;
   listJournalAssets?(gameId: string): Promise<JournalAsset[]> | JournalAsset[];
@@ -379,6 +381,14 @@ export function registerLibraryHandlers({ ipcMain, library, appearanceAuthorizat
       validateGameId(args[0]),
       validateMetadataSource(args[1]),
       validateMetadataExternalId(args[2]),
+    );
+  });
+
+  ipcMain.handle(IPC_LIBRARY_TRANSLATE_GAME_SUMMARY, async (_event, ...args) => {
+    assertArgumentCount(args, 2, IPC_LIBRARY_TRANSLATE_GAME_SUMMARY);
+    return await serviceMethod(library, 'translateGameSummary')(
+      validateGameId(args[0]),
+      validateMetadataSource(args[1]),
     );
   });
 

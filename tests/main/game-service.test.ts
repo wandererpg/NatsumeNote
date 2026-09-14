@@ -135,11 +135,14 @@ describe('database library service', () => {
       ensure: vi.fn().mockResolvedValue(complete),
       refresh: vi.fn().mockResolvedValue(complete),
       selectCandidate: vi.fn().mockResolvedValue(complete),
+      translateSummary: vi.fn().mockResolvedValue(complete),
     };
     const service = createDatabaseLibraryService(db, { metadata });
 
     await expect(service.getGameMetadata?.('g-pending')).resolves.toEqual(complete);
+    await expect(service.translateGameSummary?.('g-pending', 'vndb')).resolves.toEqual(complete);
     expect(metadata.ensure).toHaveBeenCalledWith('g-pending', expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(metadata.translateSummary).toHaveBeenCalledWith('g-pending', 'vndb');
     db.close();
   });
 

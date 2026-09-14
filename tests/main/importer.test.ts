@@ -346,6 +346,7 @@ describe('game-folder importer', () => {
       getSummary: vi.fn(),
       refresh: vi.fn(),
       selectCandidate: vi.fn(),
+      translateSummary: vi.fn(),
     } satisfies GameMetadataService;
     try {
       await mkdir(source, { recursive: true });

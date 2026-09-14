@@ -1219,6 +1219,21 @@ button:not(:disabled) {
 .game-overview__main h2 { margin: 12px 0 0; color: var(--paper-0); font-size: clamp(26px, 3vw, 40px); line-height: 1.14; letter-spacing: -.045em; }
 .game-overview__original-title { margin: 9px 0 0; color: var(--muted-1); font-size: 11px; }
 .game-overview__summary { max-width: 720px; margin: 24px 0; color: var(--muted-0); font-size: 12px; line-height: 1.9; white-space: pre-line; }
+.summary-reader { max-width: 720px; margin: 24px 0; }
+.summary-reader__toolbar { display: flex; min-height: 30px; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.summary-reader__toolbar > span { color: var(--muted-1); font-size: 9px; font-weight: 750; letter-spacing: .1em; }
+.summary-reader__translate { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid color-mix(in srgb, var(--teal-0) 36%, var(--line)); border-radius: 7px; color: var(--teal-0); background: color-mix(in srgb, var(--teal-0) 7%, transparent); font-size: 9px; }
+.summary-reader__modes { display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--ink-1) 72%, transparent); }
+.summary-reader__modes button { min-width: 42px; padding: 5px 8px; border: 0; border-radius: 6px; color: var(--muted-1); background: transparent; font-size: 9px; }
+.summary-reader__modes button[aria-pressed="true"] { color: var(--ink-0); background: var(--teal-0); box-shadow: 0 3px 10px rgba(67, 210, 191, .16); }
+.summary-reader__text { padding: 0 0 0 13px; border-left: 2px solid var(--line); }
+.summary-reader__text + .summary-reader__text { margin-top: 16px; padding-top: 15px; border-top: 1px solid var(--line); }
+.summary-reader__text--translated { border-left-color: color-mix(in srgb, var(--teal-0) 64%, transparent); }
+.summary-reader__text > span { display: block; margin-bottom: 5px; color: var(--teal-0); font-size: 8px; font-weight: 750; letter-spacing: .08em; }
+.summary-reader__text p { margin: 0; color: var(--muted-0); font-size: 12px; line-height: 1.9; white-space: pre-line; }
+.summary-reader__text--translated p { color: var(--paper-1); }
+.summary-reader > small { display: block; margin-top: 8px; color: var(--muted-1); font-size: 8px; }
+.summary-reader__error { margin: 9px 0 0; color: #ffd6e4; font-size: 9px; }
 .game-overview__tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 24px; }
 .game-overview__tags span { padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--teal-1); background: color-mix(in srgb, var(--teal-0) 6%, transparent); font-size: 9px; }
 .game-overview__facts { display: flex; flex-direction: column; gap: 0; padding-left: 24px; border-left: 1px solid var(--line); }

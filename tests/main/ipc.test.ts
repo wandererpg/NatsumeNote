@@ -18,6 +18,7 @@ import {
   IPC_LIBRARY_GET_JOURNAL_ASSETS,
   IPC_LIBRARY_REFRESH_GAME_METADATA,
   IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE,
+  IPC_LIBRARY_TRANSLATE_GAME_SUMMARY,
   IPC_LIBRARY_UPDATE_GAME,
   IPC_JOURNAL_SELECT_MEDIA,
   IPC_SCAN_CANCEL,
@@ -202,18 +203,22 @@ describe('main-process IPC handlers', () => {
       getGameMetadata: vi.fn().mockResolvedValue(summary),
       refreshGameMetadata: vi.fn().mockResolvedValue(summary),
       selectGameMetadataCandidate: vi.fn().mockResolvedValue(summary),
+      translateGameSummary: vi.fn().mockResolvedValue(summary),
     };
     registerLibraryHandlers({ ipcMain, library });
 
     await expect(ipcMain.invoke(IPC_LIBRARY_GET_GAME_METADATA, 'g1')).resolves.toEqual(summary);
     await expect(ipcMain.invoke(IPC_LIBRARY_REFRESH_GAME_METADATA, 'g1')).resolves.toEqual(summary);
     await expect(ipcMain.invoke(IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE, 'g1', 'vndb', 'v17')).resolves.toEqual(summary);
+    await expect(ipcMain.invoke(IPC_LIBRARY_TRANSLATE_GAME_SUMMARY, 'g1', 'vndb')).resolves.toEqual(summary);
     await expect(ipcMain.invoke(IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE, 'g1', 'other', 'v17')).rejects.toMatchObject({ code: 'DB_ERROR' });
+    await expect(ipcMain.invoke(IPC_LIBRARY_TRANSLATE_GAME_SUMMARY, 'g1', 'other')).rejects.toMatchObject({ code: 'DB_ERROR' });
     await expect(ipcMain.invoke(IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE, 'g1', 'vndb', '../v17')).rejects.toMatchObject({ code: 'DB_ERROR' });
     await expect(ipcMain.invoke(IPC_LIBRARY_GET_GAME_METADATA, 'g1', 'extra')).rejects.toMatchObject({ code: 'DB_ERROR' });
     expect(library.getGameMetadata).toHaveBeenCalledWith('g1');
     expect(library.refreshGameMetadata).toHaveBeenCalledWith('g1');
     expect(library.selectGameMetadataCandidate).toHaveBeenCalledWith('g1', 'vndb', 'v17');
+    expect(library.translateGameSummary).toHaveBeenCalledWith('g1', 'vndb');
   });
 
   it('validates and routes scrapbook page persistence requests', async () => {

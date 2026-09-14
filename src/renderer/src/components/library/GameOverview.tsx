@@ -1,13 +1,15 @@
 import { CalendarDays, ExternalLink, Gamepad2, Languages, LibraryBig, Sparkles, Star } from 'lucide-react';
 
 import { toCoverUrl } from '../../../../shared/cover-url';
-import type { Game, GameMetadataSourceSummary, GameMetadataSummary } from '../../../../shared/types';
+import type { Game, GameMetadataSourceSummary, GameMetadataSummary, MetadataSource } from '../../../../shared/types';
+import { SummaryReader } from './SummaryReader';
 
 export interface GameOverviewProps {
   game: Game;
   metadata: GameMetadataSummary | null;
   loading?: boolean;
   onEdit: () => void;
+  onTranslateSummary?: (source: MetadataSource) => Promise<string>;
 }
 
 function bestSource(metadata: GameMetadataSummary | null): GameMetadataSourceSummary | null {
@@ -17,7 +19,7 @@ function bestSource(metadata: GameMetadataSummary | null): GameMetadataSourceSum
     ?? null;
 }
 
-export function GameOverview({ game, metadata, loading = false, onEdit }: GameOverviewProps) {
+export function GameOverview({ game, metadata, loading = false, onEdit, onTranslateSummary }: GameOverviewProps) {
   const source = bestSource(metadata);
 
   return (
@@ -33,8 +35,14 @@ export function GameOverview({ game, metadata, loading = false, onEdit }: GameOv
         )}
         {loading ? (
           <p className="game-overview__summary">正在读取作品资料…</p>
+        ) : source?.summary ? (
+          <SummaryReader
+            original={source.summary}
+            translated={source.summaryZhCn ?? null}
+            onTranslate={onTranslateSummary ? () => onTranslateSummary(source.source) : undefined}
+          />
         ) : (
-          <p className="game-overview__summary">{source?.summary || '还没有可展示的作品简介。可以编辑作品或刷新网络资料，为这部作品补全档案。'}</p>
+          <p className="game-overview__summary">还没有可展示的作品简介。可以编辑作品或刷新网络资料，为这部作品补全档案。</p>
         )}
         {source?.tags && source.tags.length > 0 && (
           <div className="game-overview__tags" aria-label="作品标签">

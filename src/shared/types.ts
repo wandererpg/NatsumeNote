@@ -61,6 +61,8 @@ export interface GameMetadataSourceSummary {
   titleCn: string | null;
   developer: string | null;
   summary: string | null;
+  /** Cached Simplified Chinese translation created on demand. */
+  summaryZhCn?: string | null;
   score: number | null;
   rank: number | null;
   releaseDate?: string | null;

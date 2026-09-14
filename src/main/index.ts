@@ -468,6 +468,9 @@ export function createDatabaseLibraryService(
     selectGameMetadataCandidate: options.metadata
       ? (gameId, source, externalId) => options.metadata!.selectCandidate(gameId, source, externalId)
       : undefined,
+    translateGameSummary: options.metadata
+      ? (gameId, source) => options.metadata!.translateSummary(gameId, source)
+      : undefined,
     deleteGame: (gameId: string) => enqueueMutation(async () => {
       const existing = getGame(db, gameId);
       if (!existing) {

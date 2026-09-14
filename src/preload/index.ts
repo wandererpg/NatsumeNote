@@ -28,6 +28,7 @@ import {
   IPC_LIBRARY_GET_JOURNAL_ASSETS,
   IPC_LIBRARY_REFRESH_GAME_METADATA,
   IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE,
+  IPC_LIBRARY_TRANSLATE_GAME_SUMMARY,
   IPC_LIBRARY_REMOVE_TRACK_FROM_PLAYLIST,
   IPC_LIBRARY_SEARCH,
   IPC_LIBRARY_UPDATE_GAME,
@@ -154,6 +155,8 @@ export function createGalMusicApi(ipc: IpcRendererLike): GalMusicAPI {
     refreshGameMetadata: (gameId: string) => invoke<GameMetadataSummary>(IPC_LIBRARY_REFRESH_GAME_METADATA, gameId),
     selectGameMetadataCandidate: (gameId: string, source: MetadataSource, externalId: string) =>
       invoke<GameMetadataSummary>(IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE, gameId, source, externalId),
+    translateGameSummary: (gameId: string, source: MetadataSource) =>
+      invoke<GameMetadataSummary>(IPC_LIBRARY_TRANSLATE_GAME_SUMMARY, gameId, source),
     deleteGame: (gameId: string) => invoke<void>(IPC_LIBRARY_DELETE_GAME, gameId),
     bulkUpdateTracks: (request: BulkTrackRequest) =>
       invoke<BulkTrackResult>(IPC_LIBRARY_BULK_UPDATE_TRACKS, request),

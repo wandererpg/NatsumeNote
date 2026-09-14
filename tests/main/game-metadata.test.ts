@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { migrate } from '../../src/main/database/migrations';
 import { createGame, setGameCover } from '../../src/main/database/queries/games';
@@ -332,6 +332,37 @@ describe('metadata migration fixture', () => {
     } finally {
       db.close();
       await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('translates a matched summary once and reuses the cached Chinese text', async () => {
+    const db = new Database(':memory:');
+    migrate(db);
+    createGame(db, { id: 'g1', name: 'ATRI' });
+    const matched = candidate({ externalId: 'v17', summary: 'A story about the sea and an unforgettable summer.' });
+    upsertGameSource(db, {
+      gameId: 'g1', source: 'vndb', externalId: 'v17', queryName: 'ATRI', status: 'matched',
+      dataJson: JSON.stringify({ matched, candidates: [matched] }), imageUrl: null,
+      fetchedAt: '2026-09-14T00:00:00.000Z', retryAfter: null, errorMessage: null,
+    });
+    const translate = vi.fn().mockResolvedValue('一个关于大海与难忘夏日的故事。');
+    const service = createGameMetadataService({
+      db,
+      getLibraryPath: () => 'C:/Music',
+      translate,
+    });
+
+    try {
+      expect(service.translateSummary).toBeTypeOf('function');
+      const translated = await service.translateSummary('g1', 'vndb');
+      const cached = await service.translateSummary('g1', 'vndb');
+
+      expect(translated.sources[0].summaryZhCn).toBe('一个关于大海与难忘夏日的故事。');
+      expect(cached.sources[0].summaryZhCn).toBe('一个关于大海与难忘夏日的故事。');
+      expect(translate).toHaveBeenCalledOnce();
+      expect(translate).toHaveBeenCalledWith(matched.summary, expect.any(AbortSignal));
+    } finally {
+      db.close();
     }
   });
 

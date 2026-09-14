@@ -351,6 +351,17 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
     return selected;
   };
 
+  const translateGameSummary = async (gameId: string, source: MetadataSource): Promise<string> => {
+    const api = getGalMusicApi();
+    if (!api?.translateGameSummary) throw new Error('当前程序版本不支持简介翻译，请重启应用后再试。');
+    const translated = await api.translateGameSummary(gameId, source);
+    if (selectedGameId === gameId) setSelectedGameMetadata(translated);
+    if (editingGame?.id === gameId) setEditingGameMetadata(translated);
+    const summaryZhCn = translated.sources.find((item) => item.source === source)?.summaryZhCn;
+    if (!summaryZhCn) throw new Error('翻译服务没有返回有效译文，请稍后重试。');
+    return summaryZhCn;
+  };
+
   const saveSettings = async (changes: SettingsChanges) => {
     const api = getGalMusicApi();
     if (api?.saveSettings) await api.saveSettings(changes);
@@ -494,7 +505,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
                   <button type="button" aria-label="打开手账空间" className={gameViewMode === 'journal' ? 'is-active' : ''} aria-current={gameViewMode === 'journal' ? 'page' : undefined} onClick={() => setGameViewMode('journal')}><BookOpen size={15} aria-hidden="true" />手账</button>
                 </nav>
 
-                {gameViewMode === 'overview' && <GameOverview game={selectedGame} metadata={selectedGameMetadata} loading={isLoadingGameMetadata} onEdit={() => { void openGameEditor(selectedGame); }} />}
+                {gameViewMode === 'overview' && <GameOverview game={selectedGame} metadata={selectedGameMetadata} loading={isLoadingGameMetadata} onEdit={() => { void openGameEditor(selectedGame); }} onTranslateSummary={(source) => translateGameSummary(selectedGame.id, source)} />}
 
                 {gameViewMode === 'tracks' && (
                   <>
