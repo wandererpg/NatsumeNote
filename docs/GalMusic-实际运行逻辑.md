@@ -11,6 +11,7 @@ NatsumeNote 是一个 Windows 离线音乐库、播放器和按作品组织的�
 核心原则是：
 
 - 原游戏目录只读，导入时复制文件，不依赖游戏继续存在。
+- VisualArt's/RealLive 的 `.nwa` 音频由随包的 GARbro NWA bridge 解码为标准 WAV 后再写入音乐库。
 - 主进程拥有文件系统、SQLite、解包和 IPC 权限。
 - 渲染进程没有 Node.js 文件系统权限，只能使用 `window.galMusic`。
 - 音频播放发生在渲染进程，但音频字节由主进程的 `galmusic-audio://` 协议提供。
@@ -23,7 +24,8 @@ NatsumeNote 是一个 Windows 离线音乐库、播放器和按作品组织的�
 
 | 检查 | 结果 |
 | --- | --- |
-| `npm test -- --run` | 54 个测试文件、279 个测试全部通过 |
+| NWA/资源定向测试 | 10 项通过 |
+| `npm test -- --run` | 当前全量运行仍有 3 个既有渲染测试文件、23 项失败；失败集中在作品列表改版后的旧测试选择器，与 NWA 转换链无直接关系 |
 | `npx tsc --noEmit` | 通过 |
 | `npm run build` | main、preload、renderer 均构建通过 |
 | `node scripts/verify-resources.mjs` | 通过，当前 `resources/tools` 中的 GARbro 资源完整 |
@@ -233,7 +235,7 @@ g.name       → gameName
 | `dialog:select-folder` | 选择目录 | 返回路径或 null |
 | `dialog:select-files` | 选择音频文件 | 支持多选，包含 `.owp` |
 | `dialog:select-image` | 选择封面图片 | 只接受 PNG/JPG/WEBP/GIF |
-| `shell:open-explorer` | 用资源管理器打开路径 | 主进程调用 `shell.openPath` |
+| `shell:open-explorer` | 用资源管理器打开文件所在位置 | 主进程调用 `shell.showItemInFolder`，不会按文件关联启动媒体播放器 |
 | `app:get-settings` / `app:set-setting` | 读写设置 | 值在 IPC 层以字符串传输 |
 | `window:minimize` / `window:toggle-maximize` / `window:close` | 无边框窗口控制 | 只操作发送请求的窗口 |
 
@@ -522,6 +524,8 @@ JournalHistory（最多保留 80 个历史状态）
 - 便签、引用卡：适合游玩笔记、感想和台词摘录；便签可调整纸张颜色、文字颜色和字号。
 - 图片卡、视频卡：素材导入后复制到作品目录，渲染只使用受控 `galmusic-journal-media://` URL。
 - 曲目卡：引用已有曲目，可记录播放起点；页面 BGM 也通过曲目 ID 保存。
+
+普通扫描会识别 `.nwa` 文件，读取其头部中的声道、采样率和采样数计算时长。复制阶段将 `.nwa` 输出为同名 `.wav`，并以转换后文件的实际大小写入曲目记录；转换失败会保留原文件不动并将错误显示在导入结果中。
 
 VNDB/Bangumi 资料不会作为白板卡片出现。音乐导入成功后主进程会自动抓取并缓存资料；“作品资料”保留手动刷新入口，供网络恢复或名称调整后重新查询。
 

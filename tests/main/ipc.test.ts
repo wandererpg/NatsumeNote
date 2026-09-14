@@ -23,6 +23,7 @@ import {
   IPC_JOURNAL_SELECT_MEDIA,
   IPC_SCAN_CANCEL,
   IPC_SCAN_START,
+  IPC_SHELL_OPEN_EXPLORER,
 } from '../../src/shared/ipc';
 import type { BulkTrackRequest } from '../../src/shared/types';
 import { registerLibraryHandlers } from '../../src/main/ipc/library-handlers';
@@ -61,7 +62,7 @@ describe('main-process IPC handlers', () => {
     registerDialogHandlers({
       ipcMain,
       dialog,
-      shell: { openPath: vi.fn().mockResolvedValue('') },
+      shell: { showItemInFolder: vi.fn() },
       onJournalMediaSelected,
     });
 
@@ -82,7 +83,7 @@ describe('main-process IPC handlers', () => {
     registerDialogHandlers({
       ipcMain,
       dialog,
-      shell: { openPath: vi.fn().mockResolvedValue('') },
+      shell: { showItemInFolder: vi.fn() },
     });
 
     await ipcMain.invoke(IPC_DIALOG_SELECT_FILES);
@@ -90,6 +91,21 @@ describe('main-process IPC handlers', () => {
     expect(dialog.showOpenDialog).toHaveBeenCalledWith(undefined, expect.objectContaining({
       filters: [{ name: 'Audio', extensions: expect.arrayContaining(['owp']) }],
     }));
+  });
+
+  it('reveals a track in its containing folder instead of opening it as media', async () => {
+    const ipcMain = new FakeIpcMain();
+    const dialog = { showOpenDialog: vi.fn().mockResolvedValue({ canceled: true, filePaths: [] }) };
+    const openPath = vi.fn().mockResolvedValue('');
+    const showItemInFolder = vi.fn();
+    const shell = { openPath, showItemInFolder };
+    registerDialogHandlers({ ipcMain, dialog, shell });
+
+    const trackPath = 'C:\\Music\\ATRI\\音乐\\BGM01.wav';
+    await ipcMain.invoke(IPC_SHELL_OPEN_EXPLORER, trackPath);
+
+    expect(showItemInFolder).toHaveBeenCalledWith(trackPath);
+    expect(openPath).not.toHaveBeenCalled();
   });
 
   it('returns library query results from library:get-games', async () => {

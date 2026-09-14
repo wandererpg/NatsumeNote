@@ -22,7 +22,8 @@ export interface DialogLike {
 }
 
 export interface ShellLike {
-  openPath(targetPath: string): Promise<string>;
+  /** Reveal a file in its containing folder instead of opening it by association. */
+  showItemInFolder(targetPath: string): void;
 }
 
 export interface DialogHandlerDependencies {
@@ -102,10 +103,7 @@ export function registerDialogHandlers({
   ipcMain.handle(IPC_SHELL_OPEN_EXPLORER, async (_event, ...args) => {
     assertArgumentCount(args, 1, IPC_SHELL_OPEN_EXPLORER);
     assertPath(args[0], 'targetPath');
-    const errorMessage = await shell.openPath(args[0]);
-    if (errorMessage) {
-      throw new AppError('PERMISSION_DENIED', errorMessage, '无法打开文件所在位置。');
-    }
+    shell.showItemInFolder(args[0]);
   });
 }
 
