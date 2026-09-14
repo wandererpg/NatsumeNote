@@ -494,7 +494,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
                   <div className="game-room__identity">
                     <p className="eyebrow">SELECTED MEMORY</p>
                     <h1>{selectedGame.name}</h1>
-                    <span><Disc3 size={13} aria-hidden="true" />{selectedGame.trackCount} 首曲目 · 独立作品手账</span>
+                    <span><Disc3 size={13} aria-hidden="true" />{selectedGame.trackCount} 首曲目</span>
                   </div>
                   <button className="button button--ghost game-room__edit" type="button" onClick={() => { void openGameEditor(selectedGame); }}><Pencil size={14} aria-hidden="true" />编辑作品</button>
                 </header>

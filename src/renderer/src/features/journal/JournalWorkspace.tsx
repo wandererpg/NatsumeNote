@@ -91,7 +91,6 @@ function mergeAssets(current: JournalAsset[], incoming: JournalAsset[]): Journal
 function defaultPageInput(gameId: string, pageId: string, title: string): JournalPageCreate {
   const page = createBlankJournalPage(gameId, pageId, title);
   const textBlock = createJournalTextBlock(id(), 64, 132);
-  textBlock.text = '今天想把这部作品记下来。\n\n可以在这里写下感想、喜欢的场景，或任何想留下的声音。';
   return {
     id: page.id,
     gameId: page.gameId,
@@ -657,7 +656,7 @@ export function JournalWorkspace({ game, tracks, currentTrack, currentTime = 0, 
               <label>纸张颜色<input className="journal-color-input" type="color" value={page.background.color} onChange={(event) => commitPage(updateJournalBackground(page, { color: event.target.value }))} /></label>
               <label>纸张纹理<select value={page.background.pattern} onChange={(event) => commitPage(updateJournalBackground(page, { pattern: event.target.value as JournalPage['background']['pattern'] }))}><option value="paper">纸张</option><option value="plain">纯色</option><option value="grid">方格</option><option value="dots">点阵</option></select></label>
               <div className="journal-inspector__page-actions"><button className="button button--danger" type="button" onClick={() => void deletePage()} disabled={busy || pages.length <= 1}><Trash2 size={13} />删除页面</button></div>
-              {coverUrl && <div className="journal-inspector__cover"><img src={coverUrl} alt="" /><span>作品资料会在导入后自动抓取；白板只保留自由创作内容。</span></div>}
+              {coverUrl && <div className="journal-inspector__cover"><img src={coverUrl} alt="" /></div>}
             </div>
           )}
           <div className="journal-inspector__audio">

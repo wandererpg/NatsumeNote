@@ -28,7 +28,6 @@ export function GameShelf({ games, searchText, onSelectGame, onEditGame, onImpor
         <div>
           <p className="eyebrow">NATSUME ARCHIVE</p>
           <h1 id="game-shelf-title">游戏仓库</h1>
-          <p>从一部作品开始，回到它的音乐与记忆。</p>
         </div>
         <div className="game-shelf__summary" aria-label={`共 ${games.length} 部作品`}>
           <LibraryBig size={18} aria-hidden="true" />

@@ -157,7 +157,6 @@ export function GameEditor({ game, onClose, onSelectImage, onSave, metadata, onR
           <label className="settings-field">
             <span>显示名称</span>
             <input value={name} onChange={(event) => setName(event.target.value)} autoFocus />
-            <small>重命名会同步更新音乐库中的文件夹和曲目路径。</small>
           </label>
           <div className="game-editor__cover-field">
             <span className="settings-field__label">封面图片</span>
@@ -177,7 +176,6 @@ export function GameEditor({ game, onClose, onSelectImage, onSave, metadata, onR
               <header className="game-editor__metadata-header">
                 <div>
                   <span className="settings-field__label" id="game-editor-metadata-title">网络资料</span>
-                  <small>导入音乐后自动抓取并缓存 VNDB 与 Bangumi 资料</small>
                 </div>
                 <button className="button button--ghost button--small" type="button" aria-label="刷新网络资料" onClick={() => void refreshMetadata()} disabled={isRefreshingMetadata}>
                   {isRefreshingMetadata ? <LoaderCircle className="spin" size={14} aria-hidden="true" /> : <RefreshCw size={14} aria-hidden="true" />}
@@ -233,7 +231,7 @@ export function GameEditor({ game, onClose, onSelectImage, onSave, metadata, onR
           )}
           {onDelete && (
             <div className="game-editor__danger-zone">
-              <div><strong>删除音乐文件夹</strong><small>将永久删除这个作品、库内曲目和已复制的音乐文件。</small></div>
+              <div><strong>删除音乐文件夹</strong></div>
               {!confirmDelete ? (
                 <button className="button button--danger" type="button" onClick={() => setConfirmDelete(true)}><Trash2 size={15} aria-hidden="true" />删除音乐文件夹</button>
               ) : (
