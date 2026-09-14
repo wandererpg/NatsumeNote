@@ -25,6 +25,10 @@ extraResources:
       - '**/*'
 
 asar: true
+# ensure-electron-native.mjs validates/downloads the matching prebuilt module
+# before packaging; skip electron-builder's duplicate source rebuild so a local
+# Visual Studio installation is not required for every release build.
+npmRebuild: false
 asarUnpack:
   - node_modules/better-sqlite3/**/*
 

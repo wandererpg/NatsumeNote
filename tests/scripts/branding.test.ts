@@ -15,6 +15,7 @@ describe('application branding', () => {
     expect(builderConfig).toMatch(/productName:\s*NatsumeNote/);
     expect(builderConfig).toMatch(/executableName:\s*NatsumeNote/);
     expect(builderConfig).toMatch(/shortcutName:\s*NatsumeNote/);
+    expect(builderConfig).toMatch(/npmRebuild:\s*false/);
   });
 
   it('uses NatsumeNote in the welcome copy and new-library default', () => {

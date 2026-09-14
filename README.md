@@ -4,6 +4,8 @@ NatsumeNote 是一款面向 Windows 的 Galgame 音乐播放器与作品手账�
 
 当前发布版本：`0.1.0` · Windows x64 · Electron
 
+源码仓库：[github.com/wandererpg/NatsumeNote](https://github.com/wandererpg/NatsumeNote)
+
 ## 下载与安装
 
 GitHub Release 建议上传下面两个压缩包和校验文件：
@@ -18,12 +20,13 @@ GitHub Release 建议上传下面两个压缩包和校验文件：
 
 ## 功能
 
-- 递归扫描游戏目录中的 `.ogg`、`.mp3`、`.wav`、`.flac`、`.m4a`、`.aac`、`.opus`、`.wma` 和 `.owp`。
+- 递归扫描游戏目录中的 `.ogg`、`.mp3`、`.wav`、`.flac`、`.m4a`、`.aac`、`.opus`、`.wma`、`.owp` 和 VisualArt's/RealLive 的 `.nwa`。
 - 深度扫描 `.xp3`、`.rpa`、`.arc`、`.pak` 等 Galgame 资源包，并调用随发布包提供的 GARbro 工具解包。
 - 识别 Studio Miris `SM2MPX10` 无扩展名容器：自动导入 `WMSC` 音乐，也可以按需导入 `VOICE*` 语音。
 - 导入时复制文件到用户选择的音乐库，按文件哈希去重；原游戏目录不会被修改。
 - 根据曲目时长将内容放入每个游戏的 `音乐` 或 `语音` 文件夹，语音阈值可以在设置中调整。
 - 支持搜索、收藏、播放列表、曲目编号、顺序/随机/单曲循环/列表循环、进度和音量控制。
+- 作品音乐标题栏和曲目行提供文件夹按钮，可在资源管理器中定位导入后的曲目，不会按文件关联打开媒体播放器。
 - 每部作品拥有独立的“作品手账”：支持分页、可扩展画布、便签、引用、图片、视频和曲目卡。
 - 手账卡片可以拖动、缩放、旋转、锁定、调整层级并撤销/重做；页面支持纸张、方格和点阵背景，可设置页面 BGM、进入记忆模式并导出 PNG/SVG。
 - 首次导入游戏后，通过 VNDB 与 Bangumi 的公开 API 查询游戏资料，并尝试下载本地封面。网络失败不会阻止音乐入库。
@@ -37,10 +40,11 @@ GitHub Release 建议上传下面两个压缩包和校验文件：
 1. 启动 NatsumeNote，首次运行时选择音乐库目录。默认目录为 `%USERPROFILE%\Music\NatsumeNote`。
 2. 点击“导入游戏音乐”，选择游戏的根目录，并填写用于显示和网络匹配的游戏名。
 3. 普通音频可以关闭深度扫描；音频位于 `.xp3`、`.rpa`、`.arc`、`.pak` 或无扩展名游戏资源中时，打开深度扫描。
-4. 如果只想导入配乐，保持“包含语音”关闭。对于 `SM2MPX10` 游戏，`WMSC` 会被识别为音乐，`VOICE1`/`VOICE2` 等容器按选项决定是否导入。
+4. 如果只想导入配乐，保持“包含语音”关闭。对于 `SM2MPX10` 游戏，`WMSC` 会被识别为音乐，`VOICE1`/`VOICE2` 等容器按选项决定是否导入；`.nwa` 音频会通过随包的 GARbro NWA bridge 转换成标准 WAV。
 5. 等待导入结果。音乐复制完成后，软件会继续显示 VNDB、Bangumi 和本地封面处理结果。
 6. 双击曲目播放。打开“设置”可以切换主题、修改背景、文字颜色、音乐库路径、播放模式和语音判定阈值。
 7. 选中一部作品后切换到“作品手账”，可以新建页面、添加卡片和媒体、调整画布，再用“记忆模式”按页浏览。
+8. 在“作品音乐”标题栏点击右上角文件夹按钮，或点击曲目行右侧的文件夹按钮，可跳转到该曲目所在的音乐库文件夹。
 
 ## 游戏资料与封面
 
@@ -82,6 +86,10 @@ GitHub Release 建议上传下面两个压缩包和校验文件：
 
 请选择游戏根目录而不是某一个内部文件，并开启深度扫描。对于无扩展名资源，软件只会把文件头为 `SM2MPX10` 且容器名为 `WMSC` 的内容识别为音乐；`VOICE*` 需要打开包含语音选项。GARbro 诊断日志位于用户数据目录的 `logs/garbro.log`。
 
+### 如何打开音乐库文件夹
+
+进入“作品音乐”后，点击标题栏右上角的文件夹按钮；也可以点击具体曲目右侧的文件夹按钮。应用会打开资源管理器并定位曲目文件，不会启动系统媒体播放器。默认音乐库位置为 `C:\Users\<用户名>\Music\NatsumeNote`；如果修改过位置，以“设置 → 音乐库位置”显示的路径为准。
+
 ### 没有自动封面
 
 先检查导入完成页中的 VNDB/Bangumi 状态。候选不明确、无结果、网络失败和封面下载失败都不会影响播放；打开游戏编辑器后点击“刷新网络资料”，也可以直接选择本地封面。
@@ -116,11 +124,37 @@ npm run build
 npm run package:win
 ```
 
+命令完成后，NSIS 安装程序位于 `release/NatsumeNote-0.1.0-x64.exe`。如需生成完整便携目录，可再运行：
+
+```powershell
+npx electron-builder --win dir
+```
+
+然后把 `release/win-unpacked/` 中的 `NatsumeNote.exe` 和整个 `resources/` 文件夹一起压缩。发布时建议保持下面的目录结构，并使用 ZIP 文件名与校验文件名：
+
+```text
+NatsumeNote-0.1.0-windows-x64-installer.zip
+└─ NatsumeNote-0.1.0-installer/NatsumeNote-0.1.0-x64.exe
+
+NatsumeNote-0.1.0-windows-x64-portable.zip
+└─ NatsumeNote-0.1.0-portable/
+   ├─ NatsumeNote.exe
+   └─ resources/
+
+SHA256SUMS.txt
+```
+
+PowerShell 生成校验值：
+
+```powershell
+Get-FileHash .\NatsumeNote-0.1.0-windows-x64-*.zip -Algorithm SHA256
+```
+
 深度扫描依赖 `resources/tools/garbro/` 下的 GARbro 文件。发布包已经携带这套运行时资源；从源码自行打包前，请先确认资源校验通过，并确认 GARbro 及其依赖允许以你的发布方式再分发。
 
-## Git 仓库隔离
+## Git 仓库
 
-NatsumeNote 当前故意不配置 Git 远程，避免把手账功能误推送到原 NatsumeMusic 仓库。准备发布时，请先在 GitHub 新建独立的 NatsumeNote 仓库，再为本目录添加它的 SSH 地址；不要把远程指向 `wandererpg/NatsumeMusic`。
+NatsumeNote 使用独立远程仓库 `git@github.com:wandererpg/NatsumeNote.git`，不会推送到原 `wandererpg/NatsumeMusic` 仓库。提交前请确认 `git remote -v` 指向该地址，并继续遵守下面的发布材料与许可证检查。
 
 更详细的真实运行逻辑、代码地图和验证记录见：
 
