@@ -197,18 +197,18 @@ describe('bulk track operations', () => {
     await waitFor(() => expect(screen.queryByText('已选择 1 首')).not.toBeInTheDocument());
 
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: '选择 Track 1' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: '选择 Track 1' }));
     fireEvent.click(screen.getByRole('button', { name: '语音' }));
     await waitFor(() => expect(screen.queryByText('已选择 1 首')).not.toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('checkbox', { name: '选择 Track 1' }));
-    fireEvent.click(screen.getAllByRole('button', { name: '返回游戏仓库' })[0]);
-    fireEvent.click(await screen.findByTestId('game-item-game-2'));
+    fireEvent.click(await screen.findByRole('checkbox', { name: '选择 Track 1' }));
+    fireEvent.click(screen.getByTestId('game-item-game-2'));
+    await waitFor(() => expect(useUiStore.getState().selectedGameId).toBe('game-2'));
     fireEvent.click(screen.getByRole('button', { name: '打开音乐空间' }));
     await waitFor(() => expect(screen.queryByText('已选择 1 首')).not.toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('checkbox', { name: '选择 Track 1' }));
-    fireEvent.click(screen.getAllByRole('button', { name: '返回游戏仓库' })[0]);
+    fireEvent.click(await screen.findByRole('checkbox', { name: '选择 Track 1' }));
+    fireEvent.click(screen.getByTestId('sidebar-nav-recent'));
     await waitFor(() => expect(screen.queryByText('已选择 1 首')).not.toBeInTheDocument());
   });
 

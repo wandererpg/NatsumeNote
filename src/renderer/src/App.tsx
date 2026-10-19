@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Sidebar } from './components/layout/Sidebar';
+import { PlaylistEditor } from './components/library/PlaylistEditor';
 import { AlertCircle, ArrowLeft, BookOpen, Disc3, FolderOpen, Info, Music2, Pencil } from 'lucide-react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ChevronRight, Import, LibraryBig, Play } from 'lucide-react';
 
-import type { AppSettings, BulkTrackOperation, Game, GameMetadataSummary, GameUpdate, MetadataSource, ScanResult, Track, TrackKind } from '../../shared/types';
+import type { LibrarySection, Playlist, AppSettings, BulkTrackOperation, Game, GameMetadataSummary, GameUpdate, MetadataSource, ScanResult, Track, TrackKind } from '../../shared/types';
 import { TrackTable } from './components/library/TrackTable';
+import { TrackLoadingState } from './components/library/TrackLoadingState';
 import { GameEditor } from './components/library/GameEditor';
 import { PlaylistPicker } from './components/library/PlaylistPicker';
 import { TrackEditor } from './components/library/TrackEditor';
@@ -22,6 +26,8 @@ import { useLibraryStore } from './stores/libraryStore';
 import { usePlayerStore } from './stores/playerStore';
 import { useUiStore } from './stores/uiStore';
 import { toAppearanceStyle } from './theme/appearance';
+import { useNavigationMotion } from './hooks/useNavigationMotion';
+import { useSelectionIndicator } from './hooks/useSelectionIndicator';
 
 export interface AppProps {
   onPlayTrack?: (track: Track) => void;
@@ -73,7 +79,9 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
   const error = useLibraryStore((state) => state.error);
   const loadGames = useLibraryStore((state) => state.loadGames);
   const loadTracks = useLibraryStore((state) => state.loadTracks);
+  const createPlaylist = useLibraryStore((state) => state.createPlaylist);
   const loadPlaylists = useLibraryStore((state) => state.loadPlaylists);
+  const removeTrackFromPlaylist = useLibraryStore(state => state.removeTrackFromPlaylist);
   const addTrackToPlaylist = useLibraryStore((state) => state.addTrackToPlaylist);
   const renameTrack = useLibraryStore((state) => state.renameTrack);
   const toggleFavorite = useLibraryStore((state) => state.toggleFavorite);
@@ -99,6 +107,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
   const [appearancePreview, setAppearancePreview] = useState<AppearanceDraft | null>(null);
   const authorizedBackgroundRef = useRef<string | null>(defaultSettings.background.imagePath);
   const mainContentRef = useRef<HTMLElement>(null);
+  const previousQueryRef = useRef<{ context: string; search: string } | null>(null);
   const [welcomeVisible, setWelcomeVisible] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [editingGameMetadata, setEditingGameMetadata] = useState<GameMetadataSummary | null>(null);
@@ -164,6 +173,9 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
 
   useEffect(() => {
     void initializePlayer().catch(() => undefined);
+    return window.galMusic?.onUpdateState?.((state) => {
+      if (state.status === 'error') usePlayerStore.getState().finishUpdatePreparation();
+    });
   }, [initializePlayer]);
 
   useEffect(() => {
@@ -199,16 +211,24 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
     setBulkResultNotice(null);
   }, [selectedGameId, searchText, trackKindFilter, activeSection]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadTracks({
-        section: activeSection,
-        gameId: activeSection === 'library' ? selectedGameId : null,
-        playlistId: activeSection === 'playlists' ? selectedPlaylistId : null,
-        search: searchText,
-        kind: activeSection === 'library' && selectedGameId ? trackKindFilter : null,
-      });
-    }, 120);
+  useLayoutEffect(() => {
+    const query = {
+      section: activeSection,
+      gameId: activeSection === 'library' ? selectedGameId : null,
+      playlistId: activeSection === 'playlists' ? selectedPlaylistId : null,
+      search: searchText,
+      kind: activeSection === 'library' && selectedGameId ? trackKindFilter : null,
+    };
+    const context = JSON.stringify([query.section, query.gameId, query.playlistId, query.kind]);
+    const previous = previousQueryRef.current;
+    previousQueryRef.current = { context, search: searchText };
+    // Only typing needs debounce. Mark navigation as loading before paint so
+    // a new heading never flashes the previous page's songs underneath it.
+    if (previous?.context !== context || previous.search === searchText || !searchText.trim()) {
+      void loadTracks(query);
+      return;
+    }
+    const timer = window.setTimeout(() => { void loadTracks(query); }, 120);
     return () => window.clearTimeout(timer);
   }, [activeSection, loadTracks, searchText, selectedGameId, selectedPlaylistId, trackKindFilter]);
 
@@ -217,6 +237,13 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
     [games, selectedGameId],
   );
   const selectionEnabled = activeSection === 'library' && Boolean(selectedGameId);
+  const viewKey = `${activeSection}:${selectedGameId ?? ''}:${selectedPlaylistId ?? ''}`;
+  const navigate = useNavigationMotion(mainContentRef, viewKey);
+  const kindIndicator = useSelectionIndicator(`${viewKey}:${trackKindFilter ?? 'all'}`);
+
+  useEffect(() => {
+    if (mainContentRef.current) mainContentRef.current.scrollTop = 0;
+  }, [viewKey]);
 
   const runBulk = async (operation: BulkTrackOperation) => {
     if (bulkBusy || !selectedGameId || selectedTrackIds.size === 0) return;
@@ -282,24 +309,48 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
     (onPlayTrack ?? playTrackProp)?.(track);
   };
 
+  const activateTrack = (track: Track) => {
+    if (currentTrack?.id === track.id) {
+      (playerActions?.onTogglePlay ?? storeToggle)();
+    } else {
+      playTrack(track);
+    }
+  };
+
   const handleImport = () => {
     onImport?.();
     if (!onImport) setScanDialogOpen(true);
   };
 
-  const selectGame = (game: Game) => {
-    setActiveSection('library');
-    setGameViewMode('overview');
-    setSelectedPlaylist(null);
-    setSelectedGame(game.id);
-    setSearchText('');
+  const selectSection = (section: LibrarySection) => {
+    navigate(`${section}::${section === 'playlists' ? selectedPlaylistId ?? '' : ''}`, () => {
+      setActiveSection(section);
+      setSearchText('');
+      setSelectedGame(null);
+      if (section !== 'playlists') setSelectedPlaylist(null);
+    });
   };
 
-  const returnToShelf = () => {
-    setSelectedGame(null);
-    setActiveSection('library');
-    setGameViewMode('overview');
-    setSearchText('');
+  const selectGame = (game: Game) => {
+    navigate(`library:${game.id}:`, () => {
+      if (game.id !== selectedGameId) setTrackKindFilter(null);
+      setActiveSection('library');
+      setGameViewMode('overview');
+      setSelectedPlaylist(null);
+      setSelectedGame(game.id);
+      setSearchText('');
+    });
+  };
+
+  const returnToShelf = () => selectSection('library');
+
+  const selectPlaylist = (playlist: Playlist) => {
+    navigate(`playlists::${playlist.id}`, () => {
+      setActiveSection('playlists');
+      setSelectedGame(null);
+      setSelectedPlaylist(playlist.id);
+      setSearchText('');
+    });
   };
 
   const openGameEditor = async (game: Game) => {
@@ -328,11 +379,19 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
 
   const refreshEditingGameMetadata = async (): Promise<GameMetadataSummary | null> => {
     if (!editingGame) return null;
-    const refreshed = await getGalMusicApi()?.refreshGameMetadata?.(editingGame.id);
-    if (!refreshed) return null;
+    const api = getGalMusicApi();
+    if (!api?.refreshGameMetadata) {
+      throw new Error('当前应用未加载资料更新功能，请关闭应用后重新启动开发版。');
+    }
+    const requestId = metadataRequestRef.current;
+    const refreshed = await api.refreshGameMetadata(editingGame.id);
+    if (!refreshed) throw new Error('未收到更新后的资料，请重试。');
+    if (requestId !== metadataRequestRef.current) return null;
     setEditingGameMetadata(refreshed);
     if (selectedGameId === editingGame.id) setSelectedGameMetadata(refreshed);
-    await loadGames();
+    const games = await loadGames();
+    const updated = games.find(game => game.id === editingGame.id);
+    if (requestId === metadataRequestRef.current && updated) setEditingGame(updated);
     return refreshed;
   };
 
@@ -371,6 +430,28 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
     setSettings((current) => ({ ...current, ...changes }));
     authorizedBackgroundRef.current = changes.background.imagePath;
     setAppearancePreview(null);
+    const directoryChanged = changes.libraryPath !== settings.libraryPath;
+    if (!directoryChanged && !changes.rescanLibrary) return;
+    const refreshedGames = await loadGames();
+    await loadPlaylists();
+    const refreshedTracks = await api?.getTracks?.({ section: 'library', gameId: null }) ?? [];
+    const availableIds = new Set(refreshedTracks.map(track => track.id));
+    const oldQueue = usePlayerStore.getState().playlist;
+    const current = usePlayerStore.getState().currentTrack;
+    const removedIds = new Set(oldQueue.filter(track => !availableIds.has(track.id)).map(track => track.id));
+    if (current && !availableIds.has(current.id)) removedIds.add(current.id);
+    reconcileLibraryTracks(refreshedTracks, removedIds);
+    if (refreshedGames.length > 0) {
+      welcomeDismissedRef.current = true;
+      setWelcomeVisible(false);
+    }
+    if (directoryChanged) {
+      setSelectedGame(null);
+      setActiveSection('library');
+      setSearchText('');
+      setTrackKindFilter(null);
+      await loadTracks({ section: 'library', gameId: null, search: '', kind: null });
+    } else await loadTracks(useLibraryStore.getState().currentQuery);
   };
 
   const previewAppearance = (appearance: AppearanceDraft) => {
@@ -441,18 +522,14 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
     }
   };
 
-  const effectiveAppearance = appearancePreview ?? { themeId: settings.themeId, background: settings.background, fontColor: settings.fontColor ?? null };
+  const effectiveAppearance = appearancePreview ?? settings;
+  const currentCoverPath = games.find(game => game.id === currentTrack?.gameId)?.coverPath ?? null;
+  const totalMinutes = useMemo(() => Math.round(tracks.reduce((sum, track) => sum + (track.duration ?? 0), 0) / 60), [tracks]);
 
   return (
-    <div className="app-shell app-shell--archive" data-testid="app-shell" data-theme={effectiveAppearance.themeId} style={toAppearanceStyle(effectiveAppearance)}>
-      <svg className="liquid-glass-defs" aria-hidden="true" data-testid="liquid-glass-defs">
-        <defs>
-          <filter id="natsume-liquid-refraction" x="-15%" y="-30%" width="130%" height="160%" colorInterpolationFilters="sRGB">
-            <feTurbulence type="fractalNoise" baseFrequency="0.012 0.08" numOctaves="1" seed="11" result="liquidNoise" />
-            <feDisplacementMap in="SourceGraphic" in2="liquidNoise" scale="5" xChannelSelector="R" yChannelSelector="G" />
-          </filter>
-        </defs>
-      </svg>
+    <div className="app-shell app-shell--archive" data-testid="app-shell" data-theme={effectiveAppearance.themeId} style={toAppearanceStyle(effectiveAppearance)}
+      onPointerDownCapture={event => { event.currentTarget.dataset.inputModality = 'pointer'; }}
+      onKeyDownCapture={event => { event.currentTarget.dataset.inputModality = 'keyboard'; }}>
       <div className="app-shell__user-background" aria-hidden="true" />
       <div className="app-shell__background-shade" aria-hidden="true" />
       <div className="app-shell__backdrop" aria-hidden="true"><span /><span /><span /></div>
@@ -465,6 +542,9 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
         onSettingsClick={() => setCurrentModal('settings')}
       />
       <div className="app-shell__body">
+        <Sidebar showGames={Boolean(selectedGame)} games={games} playlists={playlists} selectedGameId={selectedGameId} selectedPlaylistId={selectedPlaylistId} activeSection={activeSection}
+          onSelectGame={selectGame} onEditGame={game => { void openGameEditor(game); }} onSelectPlaylist={selectPlaylist}
+          onCreatePlaylist={() => setCurrentModal('playlist-edit')} onSelectSection={selectSection} onImport={handleImport} />
         <main
           ref={mainContentRef}
           className="main-content"
@@ -479,7 +559,18 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
           ) : isLoadingGames && games.length === 0 ? (
             <section className="loading-state" aria-live="polite"><span className="loading-state__spinner" />正在加载音乐库…</section>
           ) : (
-            !selectedGame ? (
+            activeSection !== 'library' ? (
+              <section className="library-view track-section" data-view-key={viewKey} aria-label="曲目列表">
+                <div className="track-section__heading"><h1>{activeSection === 'favorites' ? '收藏' : activeSection === 'recent' ? '最近添加' : activeSection === 'playlists' ? playlists.find(item => item.id === selectedPlaylistId)?.name ?? '播放列表' : '搜索结果'}</h1><span>{tracks.length} 首曲目</span></div>
+                {isLoadingTracks ? <TrackLoadingState /> : tracks.length === 0 ? <EmptyState title="暂无曲目" description="导入歌曲或收藏喜欢的音乐后，即可在这里查看。" /> :
+                  <TrackTable tracks={tracks} playingTrackId={isPlaying ? currentTrack?.id : null} onPlayTrack={activateTrack}
+                    onRename={track => { setEditingTrack(track); setCurrentModal('track-edit'); }}
+                    onToggleFavorite={track => { void toggleFavorite(track); }} onAddToPlaylist={track => { setPlaylistTrack(track); setCurrentModal('playlist-add'); }}
+                    onDelete={activeSection === 'playlists' ? undefined : track => { void deleteTrack(track.id); }}
+                    onRemoveFromPlaylist={activeSection === 'playlists' && selectedPlaylistId ? track => { void removeTrackFromPlaylist(selectedPlaylistId, track.id); } : undefined}
+                    scrollContainerRef={mainContentRef} scrollResetKey={viewKey} onOpenFolder={handleOpenFolder} />}
+              </section>
+            ) : !selectedGame ? (
               <GameShelf
                 games={games}
                 searchText={searchText}
@@ -488,7 +579,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
                 onImport={handleImport}
               />
             ) : (
-              <div className="game-room">
+              <div className="game-room library-view" key={`${viewKey}:${gameViewMode}`}>
                 <header className="game-room__hero">
                   <button className="game-room__back" type="button" onClick={returnToShelf}><ArrowLeft size={16} aria-hidden="true" />游戏仓库</button>
                   <div className="game-room__identity">
@@ -529,14 +620,15 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
                       </div>
                     )}
                     {isLoadingTracks ? (
-                      <section className="loading-state loading-state--tracks" aria-live="polite"><span className="loading-state__spinner" />正在读取曲目…</section>
+                      <TrackLoadingState />
                     ) : tracks.length === 0 ? (
                       <EmptyState tone="tracks" title={searchText ? '没有匹配的曲目' : '这部作品暂无曲目'} description={searchText ? '换个关键词试试，或清空搜索返回当前列表。' : '导入音乐后，曲目会显示在这部作品的音乐空间。'} actionLabel={searchText ? '清空搜索' : '导入曲目'} onAction={() => searchText ? setSearchText('') : handleImport()} />
                     ) : (
                       <section className="track-section" aria-labelledby="track-section-title">
                         <div className="track-section__heading"><div><h2 id="track-section-title">作品音乐</h2><span>{tracks.length} 首曲目</span></div><div className="track-section__tools"><button className="icon-button icon-button--small" type="button" aria-label="打开曲目文件夹" title="打开曲目文件夹" onClick={() => currentTrack && void handleOpenFolder(currentTrack)}><FolderOpen size={15} aria-hidden="true" /></button></div></div>
                         {selectionEnabled && selectedTrackIds.size > 0 && <BulkTrackToolbar count={selectedTrackIds.size} busy={bulkBusy} onFavorite={() => { void runBulk({ type: 'favorite', isFavorite: true }); }} onUnfavorite={() => { void runBulk({ type: 'favorite', isFavorite: false }); }} onMove={() => setBulkDialog('move')} onAddToPlaylist={() => setBulkDialog('playlist')} onDelete={() => setBulkDialog('delete')} onClear={() => setSelectedTrackIds(new Set())} />}
-                        <TrackTable tracks={tracks} playingTrackId={currentTrack?.id} onPlayTrack={playTrack} onRename={(track) => { setEditingTrack(track); setCurrentModal('track-edit'); }} onToggleFavorite={(track) => { void toggleFavorite(track); }} onAddToPlaylist={(track) => { setPlaylistTrack(track); setCurrentModal('playlist-add'); }} onDelete={(track) => void deleteTrack(track.id)} onOpenFolder={handleOpenFolder} selectionEnabled={selectionEnabled} selectedTrackIds={selectedTrackIds} onSelectionChange={setSelectedTrackIds} selectionDisabled={bulkBusy} scrollContainerRef={mainContentRef} />
+                        <TrackTable tracks={tracks} playingTrackId={isPlaying ? currentTrack?.id : null} onPlayTrack={activateTrack} onRename={(track) => { setEditingTrack(track); setCurrentModal('track-edit'); }} onToggleFavorite={(track) => { void toggleFavorite(track); }} onAddToPlaylist={(track) => { setPlaylistTrack(track); setCurrentModal('playlist-add'); }} onDelete={(track) => void deleteTrack(track.id)} onOpenFolder={handleOpenFolder} selectionEnabled={selectionEnabled} selectedTrackIds={selectedTrackIds} onSelectionChange={setSelectedTrackIds} selectionDisabled={bulkBusy} scrollContainerRef={mainContentRef}
+                              scrollResetKey={`${viewKey}:${searchText}:${trackKindFilter ?? ''}:${gameViewMode}`} />
                       </section>
                     )}
                   </>
@@ -550,6 +642,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
       </div>
 
       <PlayerBar
+        coverPath={currentCoverPath}
         playerState={{ currentTrack, isPlaying, volume, progress, duration, currentTime, playMode }}
         onTogglePlay={playerActions?.onTogglePlay ?? storeToggle}
         onPrevious={playerActions?.onPrevious ?? (() => { void storePrevious(); })}
@@ -558,19 +651,43 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
         onVolumeChange={playerActions?.onVolumeChange ?? storeSetVolume}
         onPlayModeChange={playerActions?.onPlayModeChange ?? storeSetPlayMode}
       />
-      {scanDialogOpen && <ScanDialog onClose={() => setScanDialogOpen(false)} onCompleted={handleScanCompleted} />}
+      {scanDialogOpen && <ScanDialog onClose={() => setScanDialogOpen(false)} onCompleted={handleScanCompleted} onSelectMetadata={async gameId => {
+        const games = await getGalMusicApi()?.getGames?.();
+        const game = games?.find(item => item.id === gameId);
+        if (game) { setScanDialogOpen(false); await openGameEditor(game); }
+      }} />}
       {currentModal === 'settings' && <SettingsPanel settings={settings} onClose={() => { setAppearancePreview(null); setCurrentModal(null); }} onSelectFolder={selectLibraryFolder} onSelectBackground={selectBackgroundImage} onAppearancePreview={previewAppearance} onCancelAppearancePreview={async () => { await getGalMusicApi()?.cancelAppearancePreview?.(); authorizedBackgroundRef.current = settings.background.imagePath; }} onSave={saveSettings} />}
       {currentModal === 'game-edit' && editingGame && (
         <GameEditor
           game={editingGame}
           metadata={editingGameMetadata}
           onRefreshMetadata={refreshEditingGameMetadata}
-          onSelectMetadataCandidate={selectEditingGameMetadataCandidate}
+          onSearchMetadata={async (source, query) => {
+            const api = getGalMusicApi();
+            if (!api?.searchGameMetadata) throw new Error('请重启开发应用以加载新的资料选择功能。');
+            return api.searchGameMetadata(editingGame.id, source, query);
+          }}
+          onLookupMetadata={async (source, input) => {
+            const api = getGalMusicApi();
+            if (!api?.lookupGameMetadata) throw new Error('请重启开发应用以加载新的资料选择功能。');
+            return api.lookupGameMetadata(editingGame.id, source, input);
+          }}
+          onOpenMetadataLink={async (source, id) => {
+            const api = getGalMusicApi();
+            if (!api?.openMetadataLink) throw new Error('请重启开发应用以打开作品链接。');
+            await api.openMetadataLink(source, id);
+          }}
           onClose={() => { metadataRequestRef.current += 1; setCurrentModal(null); setEditingGame(null); setEditingGameMetadata(null); }}
           onSelectImage={() => getGalMusicApi()?.selectImage?.() ?? Promise.resolve(null)}
           onSave={async (changes: GameUpdate) => {
             const updated = await updateGame(editingGame.id, changes);
             if (updated) {
+              if (updated.metadataWarning) {
+                setEditingGame(updated);
+                setEditingGameMetadata(await getGalMusicApi()?.getGameMetadata?.(updated.id) ?? null);
+                await loadGames();
+                return updated.metadataWarning;
+              }
               setCurrentModal(null);
               setEditingGame(null);
               setEditingGameMetadata(null);
@@ -602,6 +719,10 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
           }}
         />
       )}
+      {currentModal === 'playlist-edit' && <PlaylistEditor onClose={() => setCurrentModal(null)} onSave={async name => {
+        const created = await createPlaylist(name);
+        if (created) { setCurrentModal(null); selectPlaylist(created); }
+      }} />}
       {currentModal === 'playlist-add' && playlistTrack && (
         <PlaylistPicker
           track={playlistTrack}

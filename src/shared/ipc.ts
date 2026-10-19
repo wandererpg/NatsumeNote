@@ -1,4 +1,7 @@
+import type { LibrarySyncAPI } from './library-sync';
 import type {
+  AppUpdateState,
+  PlaybackSnapshot,
   AddTracksRequest,
   AppSettings,
   AppSettingsUpdate,
@@ -6,6 +9,7 @@ import type {
   BulkTrackResult,
   Game,
   GameMetadataSummary,
+  MetadataSearchResult,
   MetadataSource,
   GameUpdate,
   JournalAsset,
@@ -51,6 +55,9 @@ export const LIBRARY_GET_GAME_METADATA = 'library:get-game-metadata' as const;
 export const LIBRARY_REFRESH_GAME_METADATA = 'library:refresh-game-metadata' as const;
 export const LIBRARY_SELECT_GAME_METADATA_CANDIDATE = 'library:select-game-metadata-candidate' as const;
 export const LIBRARY_TRANSLATE_GAME_SUMMARY = 'library:translate-game-summary' as const;
+export const LIBRARY_SEARCH_GAME_METADATA = 'library:search-game-metadata' as const;
+export const LIBRARY_LOOKUP_GAME_METADATA = 'library:lookup-game-metadata' as const;
+export const LIBRARY_OPEN_METADATA_LINK = 'library:open-metadata-link' as const;
 export const LIBRARY_DELETE_GAME = 'library:delete-game' as const;
 export const LIBRARY_BULK_UPDATE_TRACKS = 'library:bulk-update-tracks' as const;
 export const LIBRARY_GET_JOURNAL_PAGES = 'library:get-journal-pages' as const;
@@ -70,6 +77,13 @@ export const APP_CANCEL_APPEARANCE_PREVIEW = 'app:cancel-appearance-preview' as 
 export const WINDOW_MINIMIZE = 'window:minimize' as const;
 export const WINDOW_TOGGLE_MAXIMIZE = 'window:toggle-maximize' as const;
 export const WINDOW_CLOSE = 'window:close' as const;
+export const UPDATE_GET_STATE = 'update:get-state' as const;
+export const UPDATE_CHECK = 'update:check' as const;
+export const UPDATE_DOWNLOAD = 'update:download' as const;
+export const UPDATE_INSTALL = 'update:install' as const;
+export const UPDATE_STATE = 'update:state' as const;
+export const UPDATE_GET_PLAYBACK = 'update:get-playback' as const;
+export const UPDATE_OPEN_DOWNLOADS = 'update:open-downloads' as const;
 
 // Push/event channels
 export const SCAN_PROGRESS = 'scan:progress' as const;
@@ -80,6 +94,12 @@ export const PLAYER_ERROR = 'player:error' as const;
 
 /** Request channels grouped for handler registration. */
 export const IPC_REQUESTS = {
+  updateGetState: UPDATE_GET_STATE,
+  updateCheck: UPDATE_CHECK,
+  updateDownload: UPDATE_DOWNLOAD,
+  updateInstall: UPDATE_INSTALL,
+  updateGetPlayback: UPDATE_GET_PLAYBACK,
+  updateOpenDownloads: UPDATE_OPEN_DOWNLOADS,
   scanStart: SCAN_START,
   scanCancel: SCAN_CANCEL,
   libraryGetGames: LIBRARY_GET_GAMES,
@@ -98,6 +118,9 @@ export const IPC_REQUESTS = {
   libraryRefreshGameMetadata: LIBRARY_REFRESH_GAME_METADATA,
   librarySelectGameMetadataCandidate: LIBRARY_SELECT_GAME_METADATA_CANDIDATE,
   libraryTranslateGameSummary: LIBRARY_TRANSLATE_GAME_SUMMARY,
+  librarySearchGameMetadata: LIBRARY_SEARCH_GAME_METADATA,
+  libraryLookupGameMetadata: LIBRARY_LOOKUP_GAME_METADATA,
+  libraryOpenMetadataLink: LIBRARY_OPEN_METADATA_LINK,
   libraryDeleteGame: LIBRARY_DELETE_GAME,
   libraryBulkUpdateTracks: LIBRARY_BULK_UPDATE_TRACKS,
   libraryGetJournalPages: LIBRARY_GET_JOURNAL_PAGES,
@@ -121,6 +144,7 @@ export const IPC_REQUESTS = {
 
 /** Event channels grouped for preload subscriptions. */
 export const IPC_EVENTS = {
+  updateState: UPDATE_STATE,
   scanProgress: SCAN_PROGRESS,
   scanResult: SCAN_RESULT,
   playerStateChange: PLAYER_STATE_CHANGE,
@@ -157,6 +181,9 @@ export const IPC_LIBRARY_GET_GAME_METADATA = LIBRARY_GET_GAME_METADATA;
 export const IPC_LIBRARY_REFRESH_GAME_METADATA = LIBRARY_REFRESH_GAME_METADATA;
 export const IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE = LIBRARY_SELECT_GAME_METADATA_CANDIDATE;
 export const IPC_LIBRARY_TRANSLATE_GAME_SUMMARY = LIBRARY_TRANSLATE_GAME_SUMMARY;
+export const IPC_LIBRARY_SEARCH_GAME_METADATA = LIBRARY_SEARCH_GAME_METADATA;
+export const IPC_LIBRARY_LOOKUP_GAME_METADATA = LIBRARY_LOOKUP_GAME_METADATA;
+export const IPC_LIBRARY_OPEN_METADATA_LINK = LIBRARY_OPEN_METADATA_LINK;
 export const IPC_LIBRARY_DELETE_GAME = LIBRARY_DELETE_GAME;
 export const IPC_LIBRARY_BULK_UPDATE_TRACKS = LIBRARY_BULK_UPDATE_TRACKS;
 export const IPC_LIBRARY_GET_JOURNAL_PAGES = LIBRARY_GET_JOURNAL_PAGES;
@@ -186,7 +213,14 @@ export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
 export type IpcRequestChannel = (typeof IPC_REQUESTS)[keyof typeof IPC_REQUESTS];
 export type IpcEventChannel = (typeof IPC_EVENTS)[keyof typeof IPC_EVENTS];
 
-export interface GalMusicAPI {
+export interface GalMusicAPI extends LibrarySyncAPI {
+  getUpdateState?: () => Promise<AppUpdateState>;
+  checkForUpdates?: () => Promise<AppUpdateState>;
+  downloadUpdate?: () => Promise<AppUpdateState>;
+  installUpdate?: (snapshot: PlaybackSnapshot) => Promise<AppUpdateState>;
+  onUpdateState?: (listener: (state: AppUpdateState) => void) => Unsubscribe;
+  getPlaybackSnapshot?: () => Promise<PlaybackSnapshot | null>;
+  openUpdateDownloads?: () => Promise<void>;
   startScan(options: ScanStartRequest): Promise<string>;
   cancelScan(requestId: string): Promise<void>;
 
@@ -206,6 +240,9 @@ export interface GalMusicAPI {
   refreshGameMetadata?: (gameId: string) => Promise<GameMetadataSummary>;
   selectGameMetadataCandidate?: (gameId: string, source: MetadataSource, externalId: string) => Promise<GameMetadataSummary>;
   translateGameSummary?: (gameId: string, source: MetadataSource) => Promise<GameMetadataSummary>;
+  searchGameMetadata?: (gameId: string, source: MetadataSource, query: string) => Promise<MetadataSearchResult>;
+  lookupGameMetadata?: (gameId: string, source: MetadataSource, input: string) => Promise<MetadataSearchResult>;
+  openMetadataLink?: (source: MetadataSource, externalId: string) => Promise<void>;
   deleteGame?: (gameId: string) => Promise<void>;
   bulkUpdateTracks(request: BulkTrackRequest): Promise<BulkTrackResult>;
   getJournalPages?: (gameId: string) => Promise<JournalPage[]>;

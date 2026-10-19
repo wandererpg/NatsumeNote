@@ -23,6 +23,9 @@ import {
   IPC_LIBRARY_REFRESH_GAME_METADATA,
   IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE,
   IPC_LIBRARY_TRANSLATE_GAME_SUMMARY,
+  IPC_LIBRARY_SEARCH_GAME_METADATA,
+  IPC_LIBRARY_LOOKUP_GAME_METADATA,
+  IPC_LIBRARY_OPEN_METADATA_LINK,
   IPC_LIBRARY_REMOVE_TRACK_FROM_PLAYLIST,
   IPC_LIBRARY_SEARCH,
   IPC_LIBRARY_UPDATE_GAME,
@@ -38,13 +41,14 @@ import type {
   BulkTrackResult,
   Game,
   GameMetadataSummary,
+  MetadataSearchResult,
+  MetadataSource,
   GameUpdate,
   JournalAsset,
   JournalAssetKind,
   JournalPage,
   JournalPageCreate,
   JournalPageDraft,
-  MetadataSource,
   Playlist,
   Track,
   TrackQuery,
@@ -83,6 +87,9 @@ export interface LibraryService {
   refreshGameMetadata?(gameId: string): Promise<GameMetadataSummary> | GameMetadataSummary;
   selectGameMetadataCandidate?(gameId: string, source: MetadataSource, externalId: string): Promise<GameMetadataSummary> | GameMetadataSummary;
   translateGameSummary?(gameId: string, source: MetadataSource): Promise<GameMetadataSummary> | GameMetadataSummary;
+  searchGameMetadata?(gameId: string, source: MetadataSource, query: string): Promise<MetadataSearchResult>;
+  lookupGameMetadata?(gameId: string, source: MetadataSource, input: string): Promise<MetadataSearchResult>;
+  openMetadataLink?(source: MetadataSource, externalId: string): Promise<void>;
   deleteGame?(gameId: string): Promise<void> | void;
   bulkUpdateTracks?(request: BulkTrackRequest): Promise<BulkTrackResult> | BulkTrackResult;
   listJournalAssets?(gameId: string): Promise<JournalAsset[]> | JournalAsset[];
@@ -134,6 +141,13 @@ function validateMetadataExternalId(value: unknown): string {
 function validateTrackId(value: unknown): string {
   assertString(value, 'trackId');
   return value;
+}
+
+
+function validateMetadataQuery(value: unknown): string {
+  assertString(value, 'metadata query');
+  if (!value.trim() || value.length > 500) throw invalidArgument('metadata query must be 1 to 500 characters');
+  return value.trim();
 }
 
 function validateTrackQuery(value: unknown): TrackQuery {
@@ -217,7 +231,7 @@ function validateTrackUpdate(value: unknown): TrackUpdate {
 
 function validateGameUpdate(value: unknown): GameUpdate {
   assertRecord(value, 'changes');
-  assertNoUnexpectedKeys(value, ['name', 'coverPath'], 'changes');
+  assertNoUnexpectedKeys(value, ['name', 'coverPath', 'metadataSelections', 'coverSelection'], 'changes');
   const changes: GameUpdate = {};
   if (Object.prototype.hasOwnProperty.call(value, 'name')) {
     assertString(value.name, 'changes.name');
@@ -232,8 +246,26 @@ function validateGameUpdate(value: unknown): GameUpdate {
     }
     changes.coverPath = value.coverPath as string | null;
   }
+  if (value.metadataSelections !== undefined) {
+    if (!Array.isArray(value.metadataSelections) || value.metadataSelections.length > 2) throw invalidArgument('metadataSelections is invalid');
+    changes.metadataSelections = value.metadataSelections.map(item => {
+      assertRecord(item, 'metadataSelection');
+      assertNoUnexpectedKeys(item, ['source', 'candidateId', 'expectedRevision'], 'metadataSelection');
+      const source = validateMetadataSource(item.source);
+      assertString(item.candidateId, 'candidateId');
+      if (!/^[a-f0-9]{64}$/.test(item.candidateId) || !Number.isSafeInteger(item.expectedRevision) || Number(item.expectedRevision) < 0) {
+        throw invalidArgument('metadata selection identifier or revision is invalid');
+      }
+      return { source, candidateId: item.candidateId, expectedRevision: Number(item.expectedRevision) };
+    });
+    if (new Set(changes.metadataSelections.map(item => item.source)).size !== changes.metadataSelections.length) throw invalidArgument('duplicate metadata source');
+  }
+  if (value.coverSelection !== undefined) {
+    if (Object.prototype.hasOwnProperty.call(value, 'coverPath')) throw invalidArgument('choose either a local or network cover');
+    changes.coverSelection = validateMetadataSource(value.coverSelection);
+  }
   if (Object.keys(changes).length === 0) {
-    throw invalidArgument('changes must contain a name or coverPath');
+    throw invalidArgument('changes must contain an editable field');
   }
   return changes;
 }
@@ -397,6 +429,19 @@ export function registerLibraryHandlers({ ipcMain, library, appearanceAuthorizat
     return await serviceMethod(library, 'deleteGame')(validateGameId(args[0]));
   });
 
+  ipcMain.handle(IPC_LIBRARY_SEARCH_GAME_METADATA, async (_event, ...args) => {
+    assertArgumentCount(args, 3, IPC_LIBRARY_SEARCH_GAME_METADATA);
+    return await serviceMethod(library, 'searchGameMetadata')(validateGameId(args[0]), validateMetadataSource(args[1]), validateMetadataQuery(args[2]));
+  });
+  ipcMain.handle(IPC_LIBRARY_LOOKUP_GAME_METADATA, async (_event, ...args) => {
+    assertArgumentCount(args, 3, IPC_LIBRARY_LOOKUP_GAME_METADATA);
+    return await serviceMethod(library, 'lookupGameMetadata')(validateGameId(args[0]), validateMetadataSource(args[1]), validateMetadataQuery(args[2]));
+  });
+  ipcMain.handle(IPC_LIBRARY_OPEN_METADATA_LINK, async (_event, ...args) => {
+    assertArgumentCount(args, 2, IPC_LIBRARY_OPEN_METADATA_LINK);
+    return await serviceMethod(library, 'openMetadataLink')(validateMetadataSource(args[0]), validateMetadataQuery(args[1]));
+  });
+
   ipcMain.handle(IPC_LIBRARY_BULK_UPDATE_TRACKS, async (_event, ...args) => {
     assertArgumentCount(args, 1, IPC_LIBRARY_BULK_UPDATE_TRACKS);
     return await serviceMethod(library, 'bulkUpdateTracks')(validateBulkTrackRequest(args[0]));
@@ -451,8 +496,15 @@ export function registerLibraryHandlers({ ipcMain, library, appearanceAuthorizat
     assertArgumentCount(args, 1, IPC_APP_SAVE_SETTINGS);
     const value = args[0];
     assertRecord(value, 'settings');
-    assertNoUnexpectedKeys(value, ['libraryPath', 'volume', 'playMode', 'themeId', 'background'], 'settings');
+    assertNoUnexpectedKeys(value, ['libraryPath', 'volume', 'playMode', 'themeId', 'background', 'fontColor', 'rescanLibrary'], 'settings');
     assertString(value.libraryPath, 'settings.libraryPath');
+    if (value.rescanLibrary !== undefined && typeof value.rescanLibrary !== 'boolean') {
+      throw invalidArgument('settings.rescanLibrary must be boolean');
+    }
+    if (value.fontColor !== undefined && value.fontColor !== null
+      && (typeof value.fontColor !== 'string' || !/^#[0-9a-f]{6}$/i.test(value.fontColor))) {
+      throw invalidArgument('settings.fontColor must be a six-digit hex color or null');
+    }
     if (typeof value.volume !== 'number' || !Number.isFinite(value.volume) || value.volume < 0 || value.volume > 1) throw invalidArgument('settings.volume must be from 0 to 1');
     if (!['sequential', 'random', 'single-loop', 'list-loop'].includes(value.playMode as string)) throw invalidArgument('settings.playMode is invalid');
     if (!THEME_IDS.includes(value.themeId as typeof THEME_IDS[number])) throw invalidArgument('settings.themeId is invalid');

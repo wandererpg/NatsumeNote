@@ -49,3 +49,8 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: NatsumeNote
+
+publish:
+  provider: github
+  owner: wandererpg
+  repo: NatsumeNote

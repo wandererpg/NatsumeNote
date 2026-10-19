@@ -1,8 +1,11 @@
+import { LibrarySyncPanel } from './LibrarySyncPanel';
 import { useEffect, useState } from 'react';
-import { FolderOpen, ImagePlus, LoaderCircle, Save, Trash2, X } from 'lucide-react';
+import { FolderOpen, ImagePlus, LoaderCircle, Palette, Save, Trash2, Volume2, X } from 'lucide-react';
 
 import type { AppSettings, BackgroundSettings, PlayMode, ThemeId } from '../../../../shared/types';
 import { getTheme, THEMES } from '../../theme/themes';
+import { AppUpdatePanel } from './AppUpdatePanel';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 
 export interface AppearanceDraft {
   themeId: ThemeId;
@@ -14,6 +17,7 @@ export interface SettingsChanges extends AppearanceDraft {
   libraryPath: string;
   volume: number;
   playMode: PlayMode;
+  rescanLibrary?: boolean;
 }
 
 export interface SettingsPanelProps {
@@ -40,10 +44,12 @@ export function SettingsPanel({ settings, onClose, onSelectFolder, onSelectBackg
   const [themeId, setThemeId] = useState<ThemeId>(settings.themeId);
   const [background, setBackground] = useState<BackgroundSettings>(settings.background);
   const [fontColor, setFontColor] = useState<string | null>(settings.fontColor ?? null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isPicking, setIsPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useDialogFocus(() => { void cancel(); });
 
   useEffect(() => {
     setLibraryPath(settings.libraryPath);
@@ -80,7 +86,7 @@ export function SettingsPanel({ settings, onClose, onSelectFolder, onSelectBackg
   };
 
   const cancel = async () => {
-    if (isSaving || isCancelling) return;
+    if (isSaving || isCancelling || isSyncing) return;
     setIsCancelling(true);
     try {
       await onCancelAppearancePreview?.();
@@ -106,8 +112,8 @@ export function SettingsPanel({ settings, onClose, onSelectFolder, onSelectBackg
     }
   };
 
-  const save = async () => {
-    if (isSaving || isCancelling) return;
+  const save = async (rescanLibrary = false) => {
+    if (isSaving || isCancelling || isSyncing) return;
     if (!libraryPath.trim()) {
       setError('\u8bf7\u5148\u9009\u62e9\u97f3\u4e50\u5e93\u76ee\u5f55\u3002');
       return;
@@ -115,7 +121,7 @@ export function SettingsPanel({ settings, onClose, onSelectFolder, onSelectBackg
     setIsSaving(true);
     setError(null);
     try {
-      await onSave({ libraryPath: libraryPath.trim(), volume, playMode, themeId, background, fontColor });
+      await onSave({ libraryPath: libraryPath.trim(), volume, playMode, themeId, background, fontColor, ...(rescanLibrary ? { rescanLibrary: true } : {}) });
       onClose();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : '设置保存失败。');
@@ -126,14 +132,23 @@ export function SettingsPanel({ settings, onClose, onSelectFolder, onSelectBackg
 
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title" data-testid="settings-panel">
-        <header className="settings-panel__header"><div><p className="eyebrow">PREFERENCES</p><h2 id="settings-title">设置</h2></div><button className="icon-button" type="button" aria-label="关闭设置" onClick={() => void cancel()} disabled={isSaving || isCancelling}><X size={18} aria-hidden="true" /></button></header>
+      <section ref={dialogRef} className="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabIndex={-1} data-testid="settings-panel">
+        <header className="settings-panel__header"><div><p className="eyebrow">MAKE IT YOURS</p><h2 id="settings-title">设置</h2><p className="settings-panel__intro">整理音乐，也调整属于你的聆听空间。</p></div><button className="icon-button" type="button" aria-label="关闭设置" onClick={() => void cancel()} disabled={isSaving || isCancelling || isSyncing}><X size={18} aria-hidden="true" /></button></header>
         <div className="settings-panel__body">
-          <label className="settings-field"><span>音乐库位置</span><div className="settings-field__path"><input value={libraryPath} onChange={(event) => setLibraryPath(event.target.value)} aria-label="音乐库位置" /><button className="button button--ghost" type="button" onClick={() => void chooseFolder()} disabled={isPicking || isSaving}>{isPicking ? <LoaderCircle className="spin" size={14} aria-hidden="true" /> : <FolderOpen size={14} aria-hidden="true" />}浏览</button></div></label>
+          <section className="settings-group" aria-labelledby="settings-library-title">
+          <div className="settings-group__heading"><FolderOpen size={18} aria-hidden="true" /><h3 id="settings-library-title">音乐库</h3></div>
+          <label className="settings-field"><span>音乐库位置</span><div className="settings-field__path"><input value={libraryPath} onChange={(event) => setLibraryPath(event.target.value)} aria-label="音乐库位置" /><button className="button button--ghost" type="button" onClick={() => void chooseFolder()} disabled={isPicking || isSaving || isSyncing}>{isPicking ? <LoaderCircle className="spin" size={14} aria-hidden="true" /> : <FolderOpen size={14} aria-hidden="true" />}浏览</button></div></label>
+          <div className="settings-library-actions"><small>更换目录时会扫描歌曲。仅修改外观、音量或播放模式会直接保存。</small><button className="button button--ghost" type="button" onClick={() => void save(true)} disabled={isPicking || isSaving || isCancelling || isSyncing}>重新扫描歌曲</button></div>
+          </section>
+          <section className="settings-group" aria-labelledby="settings-playback-title">
+          <div className="settings-group__heading"><Volume2 size={18} aria-hidden="true" /><h3 id="settings-playback-title">播放偏好</h3></div>
+          <div className="settings-playback-grid">
           <label className="settings-field"><span>默认音量 <strong>{Math.round(volume * 100)}%</strong></span><input className="settings-range" type="range" min={0} max={1} step={0.01} value={volume} onChange={(event) => setVolume(Number(event.target.value))} aria-label="默认音量" /></label>
           <label className="settings-field"><span>播放模式</span><select value={playMode} onChange={(event) => setPlayMode(event.target.value as PlayMode)} aria-label="播放模式">{modeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+          </div>
+          </section>
           <section className="appearance-settings" aria-labelledby="appearance-title">
-            <div className="settings-section-heading"><div><p className="eyebrow">APPEARANCE</p><h3 id="appearance-title">软件外观</h3></div></div>
+            <div className="settings-group__heading"><Palette size={18} aria-hidden="true" /><h3 id="appearance-title">软件外观</h3><span>选择主题，即时预览</span></div>
             <div className="theme-grid" role="radiogroup" aria-label="软件主题">
               {THEMES.map((theme) => (
                 <label
@@ -152,7 +167,7 @@ export function SettingsPanel({ settings, onClose, onSelectFolder, onSelectBackg
                 <span>主要文字颜色</span>
                 <input type="color" value={fontColor ?? getTheme(themeId).primaryTextColor} onChange={(event) => previewAppearance(themeId, background, event.target.value)} aria-label="主要文字颜色" />
               </label>
-              <button className="button button--ghost" type="button" onClick={() => previewAppearance(themeId, background, null)} disabled={isSaving || isCancelling}>恢复主题颜色</button>
+              <button className="button button--ghost" type="button" onClick={() => previewAppearance(themeId, background, null)} disabled={isSaving || isCancelling || isSyncing}>恢复主题颜色</button>
             </div>
             <div className="background-settings">
               <div className="background-settings__heading"><div><strong>全局自定义背景</strong><small>{background.imagePath ?? '当前使用主题自带背景'}</small></div><div><button className="button button--ghost" type="button" onClick={() => void chooseBackground()} disabled={!onSelectBackground || isPicking || isSaving}>{isPicking ? <LoaderCircle className="spin" size={14} aria-hidden="true" /> : <ImagePlus size={14} aria-hidden="true" />}导入背景图片</button>{background.imagePath && <button className="icon-button" type="button" aria-label="移除背景图片" onClick={() => previewAppearance(themeId, { ...background, imagePath: null })}><Trash2 size={15} aria-hidden="true" /></button>}</div></div>
@@ -165,9 +180,11 @@ export function SettingsPanel({ settings, onClose, onSelectFolder, onSelectBackg
               </div>
             </div>
           </section>
+          <LibrarySyncPanel disabled={isSaving || isCancelling || isPicking} onBusyChange={setIsSyncing} />
+          <AppUpdatePanel />
           {error && <p className="settings-panel__error" role="alert">{error}</p>}
         </div>
-        <footer className="settings-panel__footer"><button className="button button--ghost" type="button" onClick={() => void cancel()} disabled={isSaving || isCancelling}>{isCancelling ? '正在取消…' : '取消'}</button><button className="button button--primary" type="button" onClick={() => void save()} disabled={isSaving || isCancelling}>{isSaving ? <LoaderCircle className="spin" size={15} aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}保存设置</button></footer>
+        <footer className="settings-panel__footer"><button className="button button--ghost" type="button" onClick={() => void cancel()} disabled={isSaving || isCancelling || isSyncing}>{isCancelling ? '正在取消…' : '取消'}</button><button className="button button--primary" type="button" onClick={() => void save()} disabled={isSaving || isCancelling || isSyncing}>{isSaving ? <LoaderCircle className="spin" size={15} aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}保存设置</button></footer>
       </section>
     </div>
   );

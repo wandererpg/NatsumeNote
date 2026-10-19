@@ -5,8 +5,9 @@ import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { migrate } from '../../src/main/database/migrations';
-import { createGame, setGameCover } from '../../src/main/database/queries/games';
+import { createGame, getGame, setGameCover } from '../../src/main/database/queries/games';
 import { upsertGameSource } from '../../src/main/database/queries/game-sources';
+import { setSetting } from '../../src/main/database/queries/settings';
 import {
   createGameMetadataService,
   normalizeGameName,
@@ -74,7 +75,7 @@ function fixtureHttp(): MetadataHttpClient & { calls: string[] } {
           alttitle: 'ATRI -My Dear Moments-',
           aliases: ['ATRI'],
           description: 'A story.',
-          rating: 8.5,
+          rating: 85,
           rank: 17,
           released: '2020-06-19',
           languages: ['ja', 'zh-Hans'],
@@ -260,10 +261,32 @@ describe('cover download safety', () => {
 });
 
 describe('metadata migration fixture', () => {
+  it('downloads automatic covers separately from an indexed user directory', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'natsume-indexed-cover-'));
+    const db = new Database(':memory:'); migrate(db);
+    try {
+      await mkdir(path.join(root, 'ATRI'));
+      const userCover = path.join(root, 'ATRI', '.cover.jpg');
+      await writeFile(userCover, 'user original cover');
+      createGame(db, { id: 'g1', name: 'ATRI' });
+      setSetting(db, 'library_index_path', root);
+      const base = fixtureHttp();
+      const http: MetadataHttpClient = { fetch: async (url, init) => url.startsWith('https://img.example/')
+        ? fakeResponse({ status: 200, contentType: 'image/jpeg', body: Buffer.from('new cover') })
+        : base.fetch(url, init) };
+      const service = createGameMetadataService({ db, getLibraryPath: () => root, http });
+      await service.ensure('g1', { signal: new AbortController().signal });
+      const coverPath = getGame(db, 'g1')!.coverPath!;
+      expect(await readFile(userCover, 'utf8')).toBe('user original cover');
+      expect(path.basename(path.dirname(coverPath))).toMatch(/^\.natsume-auto-cover-/);
+      expect(await readFile(coverPath, 'utf8')).toBe('new cover');
+    } finally { db.close(); await rm(root, { recursive: true, force: true }); }
+  });
   it('keeps the metadata test database on the current schema', () => {
     const db = new Database(':memory:');
     migrate(db);
-    expect(db.pragma('user_version', { simple: true })).toBe(6);
+    expect(db.pragma('user_version', { simple: true })).toBe(8);
+    expect(db.pragma('user_version', { simple: true })).toBe(8);
     db.close();
   });
 

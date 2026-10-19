@@ -74,7 +74,7 @@ describe('file utilities', () => {
   });
 
   it('reads duration from a VisualArt RealLive NWA header', async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), 'natsumenote-nwa-'));
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'galmusic-nwa-'));
     const source = path.join(dir, 'BGM01.nwa');
     const header = Buffer.alloc(44);
     header.writeUInt16LE(2, 0);

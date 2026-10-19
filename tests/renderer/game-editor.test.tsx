@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { GameEditor } from '../../src/renderer/src/components/library/GameEditor';
-import type { Game, GameMetadataSummary } from '../../src/shared/types';
+import type { Game, GameMetadataSummary, MetadataCandidate } from '../../src/shared/types';
+afterEach(cleanup);
 
 const game: Game = {
   id: 'game-delete', name: 'Delete Me', coverPath: null, coverSource: null, folderPath: 'C:/Music/Delete Me', trackCount: 3,
@@ -11,8 +12,74 @@ const game: Game = {
 };
 
 describe('GameEditor deletion', () => {
-  afterEach(() => cleanup());
+  it('shows IPC errors when searching for a linked work', async () => {
+    const metadata: GameMetadataSummary = {
+      gameId: game.id, coverSource: null,
+      sources: [{ source: 'vndb', status: 'pending', queryName: game.name,
+        externalId: null, title: null, titleCn: null, developer: null, summary: null,
+        score: null, rank: null, fetchedAt: null, errorMessage: null, candidates: [], revision: 0 }],
+    };
+    render(<GameEditor game={game} metadata={metadata} onSave={vi.fn()} onClose={vi.fn()}
+      onSelectImage={vi.fn()} onSearchMetadata={vi.fn().mockRejectedValue({
+        code: 'DB_ERROR', userMessage: '正在切换并扫描音乐库，请稍候。',
+      })} />);
+    fireEvent.click(screen.getByRole('button', { name: '选择 VNDB 作品' }));
+    fireEvent.click(screen.getByRole('button', { name: '搜索' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('正在切换并扫描音乐库，请稍候。');
+  });
+  it('shows the IPC error message when updating linked metadata fails', async () => {
+    render(<GameEditor game={game} onSave={vi.fn()} onClose={vi.fn()} onSelectImage={vi.fn()}
+      onRefreshMetadata={vi.fn().mockRejectedValue({ code: 'DB_ERROR', userMessage: '资料请求超时，请稍后重试。' })} />);
+    fireEvent.click(screen.getByRole('button', { name: '刷新网络资料' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('资料请求超时，请稍后重试。'));
+    expect(screen.getByRole('alert')).not.toHaveTextContent('[object Object]');
+  });
+  it('keeps new search candidates when the user cancels and reopens the picker', async () => {
+    const candidate: MetadataCandidate = { candidateId: 'a'.repeat(64), externalId: 'v3', title: 'Search result', titleCn: null, aliases: [], developer: null, summary: 'Details', score: null, rank: null, imageUrl: null };
+    const metadata: GameMetadataSummary = { gameId: game.id, coverSource: null, sources: [{ source: 'vndb', status: 'ambiguous', queryName: game.name, externalId: null, title: null, titleCn: null, developer: null, summary: null, score: null, rank: null, fetchedAt: null, errorMessage: null, candidates: [], revision: 1 }] };
+    const onSave = vi.fn();
+    render(<GameEditor game={game} metadata={metadata} onSave={onSave} onClose={vi.fn()} onSelectImage={vi.fn()} onSearchMetadata={vi.fn().mockResolvedValue({ source: 'vndb', queryName: 'New search', revision: 1, candidates: [candidate] })} />);
+    fireEvent.click(screen.getByRole('button', { name: '选择 VNDB 作品' }));
+    fireEvent.click(screen.getByRole('button', { name: '搜索' }));
+    await screen.findByRole('radio', { name: 'Search result v3' });
+    fireEvent.click(screen.getByRole('radio', { name: 'Search result v3' }));
+    fireEvent.click(screen.getByRole('button', { name: '取消选择' }));
+    expect(onSave).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '选择 VNDB 作品' }));
+    expect(screen.getByRole('radio', { name: 'Search result v3' })).not.toBeChecked();
+  });
+  it('lets the user choose a cached ambiguous candidate and commits it only on Save', async () => {
+    const candidates: MetadataCandidate[] = ['v1', 'v2'].map((externalId, index) => ({
+      candidateId: String(index + 1).repeat(64), externalId, title: `作品 ${index + 1}`, titleCn: null,
+      aliases: [], developer: null, summary: '候选简介', score: null, rank: null, imageUrl: null,
+    }));
+    const metadata: GameMetadataSummary = { gameId: game.id, coverSource: null, sources: [{
+      source: 'vndb', status: 'ambiguous', queryName: game.name, externalId: null, title: null,
+      titleCn: null, developer: null, summary: null, score: null, rank: null, fetchedAt: null,
+      errorMessage: null, candidates, revision: 3,
+    }] };
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<GameEditor game={game} metadata={metadata} onRefreshMetadata={vi.fn()}
+      onSearchMetadata={vi.fn()} onLookupMetadata={vi.fn()} onClose={vi.fn()}
+      onSelectImage={vi.fn()} onSave={onSave} />);
+    fireEvent.click(screen.getByRole('button', { name: '选择 VNDB 作品' }));
+    expect(screen.getByRole('button', { name: '使用此作品' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('radio', { name: /作品 2/ }));
+    fireEvent.click(screen.getByRole('button', { name: '使用此作品' }));
+    expect(screen.getByText('已选择，尚未保存')).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '保存更改' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith({ name: game.name,
+      metadataSelections: [{ source: 'vndb', candidateId: candidates[1].candidateId, expectedRevision: 3 }] }));
+  });
 
+  it('does not save a selected candidate when the editor is cancelled', async () => {
+    const onSave = vi.fn(); const onClose = vi.fn();
+    render(<GameEditor game={game} onSave={onSave} onClose={onClose} onSelectImage={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSave).not.toHaveBeenCalled();
+  });
   it('requires an explicit confirmation before deleting the music folder', async () => {
     const onDelete = vi.fn().mockResolvedValue(undefined);
     render(
@@ -47,11 +114,6 @@ describe('GameEditor deletion', () => {
           summary: 'A locally cached summary.',
           score: 8.5,
           rank: 17,
-          releaseDate: '2020-06-19',
-          languages: ['ja', 'zh-Hans'],
-          platforms: ['win'],
-          tags: ['Science fiction', 'Android'],
-          sourceUrl: 'https://vndb.org/v17',
           fetchedAt: '2026-08-24T00:00:00.000Z',
           errorMessage: null,
         },
@@ -86,69 +148,9 @@ describe('GameEditor deletion', () => {
     expect(screen.getByText('网络资料')).toBeInTheDocument();
     expect(screen.getByText('封面：已添加（VNDB）')).toBeInTheDocument();
     expect(screen.getByText('开发商：Frontwing')).toBeInTheDocument();
-    expect(screen.getByText('发行日期：2020-06-19')).toBeInTheDocument();
-    expect(screen.getByText('平台：win')).toBeInTheDocument();
-    expect(screen.getByText('Science fiction')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '查看 VNDB 条目' })).toHaveAttribute('href', 'https://vndb.org/v17');
     expect(screen.getByText('已匹配')).toBeInTheDocument();
     expect(screen.getByText('无结果')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '刷新网络资料' }));
     await waitFor(() => expect(onRefreshMetadata).toHaveBeenCalledTimes(1));
-  });
-
-  it('lets the user choose and confirm an ambiguous source candidate', async () => {
-    const candidates = [
-      {
-        externalId: 'v17', title: 'ATRI -My Dear Moments-', titleCn: 'ATRI', developer: 'Frontwing',
-        summary: '候选一', score: 8.5, rank: null, releaseDate: '2020-06-19', languages: ['ja'], platforms: ['win'],
-        tags: ['科幻'], sourceUrl: 'https://vndb.org/v17',
-      },
-      {
-        externalId: 'v18', title: 'ATRI Another Story', titleCn: null, developer: 'Studio B',
-        summary: '候选二', score: 7.1, rank: null, releaseDate: '2021-01-01', languages: ['ja'], platforms: ['win'],
-        tags: [], sourceUrl: 'https://vndb.org/v18',
-      },
-    ];
-    const ambiguous: GameMetadataSummary = {
-      gameId: game.id,
-      coverSource: null,
-      sources: [
-        {
-          source: 'vndb', status: 'ambiguous', queryName: 'ATRI', externalId: null, title: null, titleCn: null,
-          developer: null, summary: null, score: null, rank: null, candidates, fetchedAt: '2026-09-14T00:00:00.000Z', errorMessage: null,
-        },
-        {
-          source: 'bangumi', status: 'no_match', queryName: 'ATRI', externalId: null, title: null, titleCn: null,
-          developer: null, summary: null, score: null, rank: null, candidates: [], fetchedAt: '2026-09-14T00:00:00.000Z', errorMessage: null,
-        },
-      ],
-    };
-    const matched: GameMetadataSummary = {
-      ...ambiguous,
-      coverSource: 'vndb',
-      sources: [{ ...ambiguous.sources[0], ...candidates[0], status: 'matched', candidates }, ambiguous.sources[1]],
-    };
-    const onSelectMetadataCandidate = vi.fn().mockResolvedValue(matched);
-    render(
-      <GameEditor
-        game={game}
-        metadata={ambiguous}
-        onRefreshMetadata={vi.fn().mockResolvedValue(ambiguous)}
-        onSelectMetadataCandidate={onSelectMetadataCandidate}
-        onClose={vi.fn()}
-        onSelectImage={vi.fn().mockResolvedValue(null)}
-        onSave={vi.fn().mockResolvedValue(undefined)}
-      />,
-    );
-
-    expect(screen.getByText('请选择正确的 VNDB 条目')).toBeInTheDocument();
-    const confirm = screen.getByRole('button', { name: '确认 VNDB 匹配' });
-    expect(confirm).toBeDisabled();
-    fireEvent.click(screen.getByRole('radio', { name: /ATRI -My Dear Moments-/ }));
-    expect(confirm).toBeEnabled();
-    fireEvent.click(confirm);
-
-    await waitFor(() => expect(onSelectMetadataCandidate).toHaveBeenCalledWith(game.id, 'vndb', 'v17'));
-    expect(await screen.findByText('已匹配')).toBeInTheDocument();
   });
 });

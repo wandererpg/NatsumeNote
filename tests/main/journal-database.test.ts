@@ -18,7 +18,7 @@ describe('journal database', () => {
     const db = new Database(':memory:');
     migrate(db);
 
-    expect(db.pragma('user_version', { simple: true })).toBe(6);
+    expect(db.pragma('user_version', { simple: true })).toBe(8);
     expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'journal_pages'").get())
       .toEqual({ name: 'journal_pages' });
     expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'journal_assets'").get())
@@ -90,4 +90,21 @@ describe('journal database', () => {
     expect(listJournalAssets(db, 'g1')).toEqual([]);
     db.close();
   });
+});
+
+
+it('upgrades a version 6 journal library without changing pages, assets or soundtrack IDs', () => {
+  const db = new Database(':memory:'); migrate(db);
+  createGame(db, { id: 'legacy-game', name: '旧作品' });
+  createJournalPage(db, { id: 'legacy-page', gameId: 'legacy-game', title: '旧手账', canvasWidth: 1440, canvasHeight: 1000 });
+  db.prepare("INSERT INTO journal_assets (id, game_id, kind, file_path, file_name, mime_type, file_size, file_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run('legacy-asset', 'legacy-game', 'image', 'C:/Music/旧作品/a.png', 'a.png', 'image/png', 5, 'asset-hash');
+  for (const column of ['match_method', 'confirmed_at', 'revision', 'search_status', 'search_error', 'search_fetched_at']) db.exec(`ALTER TABLE game_sources DROP COLUMN ${column}`);
+  db.pragma('user_version = 6');
+  const pages = db.prepare('SELECT * FROM journal_pages').all();
+  const assets = db.prepare('SELECT * FROM journal_assets').all();
+  migrate(db); migrate(db);
+  expect(db.prepare('SELECT * FROM journal_pages').all()).toEqual(pages);
+  expect(db.prepare('SELECT * FROM journal_assets').all()).toEqual(assets);
+  expect(db.pragma('user_version', { simple: true })).toBe(8);
+  expect(db.pragma('integrity_check', { simple: true })).toBe('ok'); db.close();
 });

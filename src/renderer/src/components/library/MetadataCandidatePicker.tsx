@@ -43,11 +43,11 @@ export function MetadataCandidatePicker({ source, selectedId, busy, onSelectionC
                 {candidate.titleCn && candidate.titleCn !== candidate.title && <small>{candidate.title}</small>}
                 <span>{[
                   candidate.developer,
-                  candidate.releaseDate,
+                  candidate.released,
                   candidate.score !== null ? `评分 ${candidate.score.toFixed(1)}` : null,
                 ].filter(Boolean).join(' · ') || `条目 ${candidate.externalId}`}</span>
               </span>
-              <a href={candidate.sourceUrl} target="_blank" rel="noreferrer" aria-label={`查看 ${candidate.title} 的 ${label} 条目`} onClick={(event) => event.stopPropagation()}><ExternalLink size={14} aria-hidden="true" /></a>
+              <a href={(source.source === 'vndb' ? `https://vndb.org/${candidate.externalId}` : `https://bgm.tv/subject/${candidate.externalId}`)} target="_blank" rel="noreferrer" aria-label={`查看 ${candidate.title} 的 ${label} 条目`} onClick={(event) => event.stopPropagation()}><ExternalLink size={14} aria-hidden="true" /></a>
             </label>
           );
         })}

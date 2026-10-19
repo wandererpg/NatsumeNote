@@ -137,13 +137,11 @@ describe('renderer shell', () => {
     expect(screen.queryByText('仅保存在本机')).not.toBeInTheDocument();
   });
 
-  it('mounts one shared SVG refraction definition for the liquid-glass table header', async () => {
+  it('uses the archive shell without expensive SVG refraction', async () => {
     mockGalMusic([game], [track]);
     render(<App />);
-
-    const defs = await screen.findByTestId('liquid-glass-defs');
-    expect(defs.querySelector('#natsume-liquid-refraction')).toBeInTheDocument();
-    expect(defs.querySelector('feDisplacementMap')).toBeInTheDocument();
+    expect(await screen.findByTestId('app-shell')).toHaveClass('app-shell--archive');
+    expect(screen.queryByTestId('liquid-glass-defs')).not.toBeInTheDocument();
   });
 
   it('places the track table inside the single right-side main content scroller', async () => {

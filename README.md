@@ -6,6 +6,12 @@ NatsumeNote 是一款面向 Windows 的 Galgame 音乐播放器与作品手账�
 
 源码仓库：[github.com/wandererpg/NatsumeNote](https://github.com/wandererpg/NatsumeNote)
 
+## 开发版更新（尚未重新打包）
+
+开发源码已同步音乐软件的界面、转场与按钮动效、加载提示、设置保存与目录识别修复、资料确认流程，以及 AFA/BGI 等资源格式支持；保留作品概览、人物资料与分页手账。音乐库兼容迁移至 schema 8。
+
+新增两端手动同步：在设置中导出完整同步文件夹，在另一端选择 `manifest.json`，预览后确认合并歌曲、收藏、播放列表与作品资料。详见 [双向同步操作说明](docs/library-sync-guide.md)。现有 0.1.0 安装包没有被本次源码更新替换。
+
 ## 下载与安装
 
 GitHub Release 建议上传下面两个压缩包和校验文件：

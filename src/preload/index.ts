@@ -1,6 +1,8 @@
+import { SYNC_EXPORT, SYNC_PREVIEW, SYNC_APPLY, type SyncExportResult, type SyncPreview, type SyncApplyResult } from '../shared/library-sync';
 import { contextBridge, ipcRenderer } from 'electron';
 
 import {
+  UPDATE_GET_STATE, UPDATE_CHECK, UPDATE_DOWNLOAD, UPDATE_INSTALL, UPDATE_STATE, UPDATE_GET_PLAYBACK, UPDATE_OPEN_DOWNLOADS,
   IPC_APP_GET_SETTINGS,
   IPC_APP_CANCEL_APPEARANCE_PREVIEW,
   IPC_APP_SAVE_SETTINGS,
@@ -29,6 +31,9 @@ import {
   IPC_LIBRARY_REFRESH_GAME_METADATA,
   IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE,
   IPC_LIBRARY_TRANSLATE_GAME_SUMMARY,
+  IPC_LIBRARY_SEARCH_GAME_METADATA,
+  IPC_LIBRARY_LOOKUP_GAME_METADATA,
+  IPC_LIBRARY_OPEN_METADATA_LINK,
   IPC_LIBRARY_REMOVE_TRACK_FROM_PLAYLIST,
   IPC_LIBRARY_SEARCH,
   IPC_LIBRARY_UPDATE_GAME,
@@ -46,6 +51,7 @@ import {
 import { serializeAppError } from '../shared/errors';
 import type { SerializedAppError } from '../shared/errors';
 import type {
+  AppUpdateState, PlaybackSnapshot,
   AddTracksRequest,
   AppSettings,
   AppSettingsUpdate,
@@ -59,6 +65,7 @@ import type {
   JournalPage,
   JournalPageCreate,
   JournalPageDraft,
+  MetadataSearchResult,
   GameUpdate,
   PlayerErrorListener,
   PlayerState,
@@ -136,6 +143,16 @@ function createInvoker(ipc: IpcRendererLike) {
 export function createGalMusicApi(ipc: IpcRendererLike): GalMusicAPI {
   const invoke = createInvoker(ipc);
   return {
+    exportSyncPackage: () => invoke<SyncExportResult | null>(SYNC_EXPORT),
+    previewSyncPackage: () => invoke<SyncPreview | null>(SYNC_PREVIEW),
+    applySyncPackage: (token, preference) => invoke<SyncApplyResult>(SYNC_APPLY, token, preference),
+    getUpdateState: () => invoke<AppUpdateState>(UPDATE_GET_STATE),
+    checkForUpdates: () => invoke<AppUpdateState>(UPDATE_CHECK),
+    downloadUpdate: () => invoke<AppUpdateState>(UPDATE_DOWNLOAD),
+    installUpdate: (snapshot: PlaybackSnapshot) => invoke<AppUpdateState>(UPDATE_INSTALL, snapshot),
+    getPlaybackSnapshot: () => invoke<PlaybackSnapshot | null>(UPDATE_GET_PLAYBACK),
+    openUpdateDownloads: () => invoke<void>(UPDATE_OPEN_DOWNLOADS),
+    onUpdateState: (listener) => eventSubscription<AppUpdateState>(ipc, UPDATE_STATE, listener),
     startScan: (options: ScanStartRequest) => invoke<string>(IPC_SCAN_START, options),
     cancelScan: (requestId: string) => invoke<void>(IPC_SCAN_CANCEL, requestId),
 
@@ -157,6 +174,9 @@ export function createGalMusicApi(ipc: IpcRendererLike): GalMusicAPI {
       invoke<GameMetadataSummary>(IPC_LIBRARY_SELECT_GAME_METADATA_CANDIDATE, gameId, source, externalId),
     translateGameSummary: (gameId: string, source: MetadataSource) =>
       invoke<GameMetadataSummary>(IPC_LIBRARY_TRANSLATE_GAME_SUMMARY, gameId, source),
+    searchGameMetadata: (gameId: string, source: MetadataSource, query: string) => invoke<MetadataSearchResult>(IPC_LIBRARY_SEARCH_GAME_METADATA, gameId, source, query),
+    lookupGameMetadata: (gameId: string, source: MetadataSource, input: string) => invoke<MetadataSearchResult>(IPC_LIBRARY_LOOKUP_GAME_METADATA, gameId, source, input),
+    openMetadataLink: (source: MetadataSource, externalId: string) => invoke<void>(IPC_LIBRARY_OPEN_METADATA_LINK, source, externalId),
     deleteGame: (gameId: string) => invoke<void>(IPC_LIBRARY_DELETE_GAME, gameId),
     bulkUpdateTracks: (request: BulkTrackRequest) =>
       invoke<BulkTrackResult>(IPC_LIBRARY_BULK_UPDATE_TRACKS, request),

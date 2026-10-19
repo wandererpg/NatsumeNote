@@ -1,11 +1,16 @@
 import type Database from 'better-sqlite3';
+import { randomUUID } from 'node:crypto';
 import { access, rm } from 'node:fs/promises';
 import path from 'node:path';
 
 import { getGame, setGameCover } from '../database/queries/games';
+import { getSetting } from '../database/queries/settings';
+import { LIBRARY_INDEX_PATH } from './library-directory';
 import { getGameSource, getGameSources, upsertGameSource, type GameSourceInput, type GameSourceRow } from '../database/queries/game-sources';
 import { AppError } from '../../shared/errors';
 import type { CoverSource, GameMetadataCandidateSummary, GameMetadataCharacterSummary, GameMetadataSourceSummary, GameMetadataStaffSummary, GameMetadataSummary, MetadataSource, MetadataStatus } from '../../shared/types';
+import type { GameUpdate, MetadataSearchResult } from '../../shared/types';
+import { createMetadataSelection, type PreparedMetadataUpdate } from './metadata-selection';
 import { assertWithin, sanitizeDirectoryName } from '../../shared/paths';
 import { downloadCover, type CoverHttpClient } from './cover-download';
 import { translateSummaryToChinese } from './summary-translation';
@@ -49,6 +54,7 @@ export interface NormalizedMetadataCandidate {
   sourceUrl: string;
   characters: GameMetadataCharacterSummary[];
   staff: GameMetadataStaffSummary[];
+  released?: string | null;
 }
 
 export interface CandidateResolution {
@@ -150,7 +156,7 @@ export function summarizeCandidate(
     platforms: matched?.platforms ?? [],
     tags: matched?.tags ?? [],
     sourceUrl: matched?.sourceUrl ?? null,
-    candidates: candidates.map(toCandidateSummary),
+    candidates: [],
     characters: matched?.characters ?? [],
     staff: matched?.staff ?? [],
     creditsError,
@@ -300,7 +306,7 @@ function vndbCandidate(value: unknown): NormalizedMetadataCandidate | null {
     aliases: [...new Set(aliases)],
     developer: developers[0] ?? null,
     summary: asString(row.description),
-    score: asNumber(row.rating),
+    score: asNumber(row.rating) === null ? null : asNumber(row.rating)! / 10,
     rank: asNumber(row.rank),
     releaseDate: asString(row.released),
     languages: uniqueStrings(asStringArray(row.languages), 8),
@@ -310,6 +316,7 @@ function vndbCandidate(value: unknown): NormalizedMetadataCandidate | null {
     sourceUrl: sourceUrl('vndb', externalId),
     characters: [],
     staff: [],
+    released: asString(row.released),
   };
 }
 
@@ -351,7 +358,7 @@ function bangumiCandidate(search: Record<string, unknown>, detail: Record<string
   const externalId = asIdentifier(detail.id) ?? asIdentifier(search.id);
   const title = asString(detail.name) ?? asString(search.name);
   if (!externalId || !title) return null;
-  const images = asRecord(detail.images);
+    const images = asRecord(detail.images);
   const imageUrl = httpsImage(images.large) ?? httpsImage(images.medium) ?? httpsImage(images.common) ?? httpsImage(search.image);
   const aliases = [asString(detail.name_cn), asString(search.name_cn)].filter((item): item is string => Boolean(item));
   return {
@@ -395,7 +402,8 @@ export async function searchBangumi(name: string, signal: AbortSignal, http: Met
   const results = Array.isArray(searchBody.data)
     ? searchBody.data.map(asRecord).filter((item) => asIdentifier(item.id))
     : [];
-  const enriched = await Promise.all(results.slice(0, 3).map(async (search) => {
+  const enriched = await Promise.all(results.slice(0, 10).map(async (search, index) => {
+    if (index >= 3) return bangumiCandidate(search, search);
     const id = asIdentifier(search.id)!;
     try {
       const detailResponse = await http.fetch(`https://api.bgm.tv/v0/subjects/${encodeURIComponent(id)}`, {
@@ -410,6 +418,20 @@ export async function searchBangumi(name: string, signal: AbortSignal, http: Met
     }
   }));
   return enriched.filter((item): item is NormalizedMetadataCandidate => Boolean(item));
+}
+
+async function lookupMetadata(source: MetadataSource, id: string, signal: AbortSignal, http: MetadataHttpClient): Promise<NormalizedMetadataCandidate> {
+  const response = source === 'vndb'
+    ? await http.fetch('https://api.vndb.org/kana/vn', { method: 'POST', signal,
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ filters: ['id', '=', id], fields: 'id,title,alttitle,aliases,description,developers.name,rating,image.url,released', results: 1 }) })
+    : await http.fetch(`https://api.bgm.tv/v0/subjects/${encodeURIComponent(id)}`, { signal,
+      headers: { Accept: 'application/json', 'User-Agent': APPLICATION_USER_AGENT } });
+  const body = await expectJson(response, source);
+  if (source === 'bangumi' && body.type !== undefined && body.type !== 4) throw new Error('该 Bangumi 条目不是游戏作品。');
+  const item = source === 'vndb' ? vndbCandidate(Array.isArray(body.results) ? body.results[0] : null) : bangumiCandidate(body, body);
+  if (!item || item.externalId !== id) throw new Error('没有找到对应的作品条目。');
+  return item;
 }
 
 function defaultHttpClient(): MetadataHttpClient {
@@ -463,9 +485,18 @@ function parseSourceData(row: GameSourceRow): StoredSourceData {
   if (!row.dataJson) return { matched: null, candidates: [], summaryZhCn: null, creditsLoaded: false, creditsError: null };
   try {
     const data = JSON.parse(row.dataJson) as { matched?: unknown; candidates?: unknown; summaryZhCn?: unknown; creditsLoaded?: unknown; creditsError?: unknown };
-    const matched = data.matched && typeof data.matched === 'object' ? data.matched as NormalizedMetadataCandidate : null;
+    const sanitize = (value: unknown): NormalizedMetadataCandidate | null => {
+      const item = asRecord(value);
+      if (!asIdentifier(item.externalId) || !asString(item.title)) return null;
+      return { ...item, aliases: asStringArray(item.aliases), languages: asStringArray(item.languages),
+        platforms: asStringArray(item.platforms), tags: asStringArray(item.tags),
+        characters: Array.isArray(item.characters) ? item.characters : [], staff: Array.isArray(item.staff) ? item.staff : [],
+        released: asString(item.released) ?? asString(item.releaseDate),
+      } as unknown as NormalizedMetadataCandidate;
+    };
+    const matched = sanitize(data.matched);
     const candidates = Array.isArray(data.candidates)
-      ? data.candidates.filter((item): item is NormalizedMetadataCandidate => typeof item === 'object' && item !== null)
+      ? data.candidates.slice(0, 20).map(sanitize).filter((item): item is NormalizedMetadataCandidate => Boolean(item))
       : [];
     const summaryZhCn = typeof data.summaryZhCn === 'string' && data.summaryZhCn.trim() ? data.summaryZhCn.trim() : null;
     const creditsError = typeof data.creditsError === 'string' && data.creditsError.trim() ? data.creditsError.trim() : null;
@@ -528,6 +559,10 @@ export interface GameMetadataService {
   refresh(gameId: string, signal?: AbortSignal): Promise<GameMetadataSummary>;
   selectCandidate(gameId: string, source: MetadataSource, externalId: string, signal?: AbortSignal): Promise<GameMetadataSummary>;
   translateSummary(gameId: string, source: MetadataSource, signal?: AbortSignal): Promise<GameMetadataSummary>;
+  search(gameId: string, source: MetadataSource, query: string): Promise<MetadataSearchResult>;
+  lookup(gameId: string, source: MetadataSource, input: string): Promise<MetadataSearchResult>;
+  prepareUpdate(gameId: string, changes: GameUpdate): Promise<PreparedMetadataUpdate>;
+  withGameLock<T>(gameId: string, task: () => Promise<T>): Promise<T>;
 }
 
 export interface GameMetadataServiceOptions {
@@ -587,6 +622,18 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
       });
     }
   };
+  const queues = new Map<string, Promise<unknown>>();
+  const withGameLock = <T>(gameId: string, task: () => Promise<T>): Promise<T> => {
+    const next = (queues.get(gameId) ?? Promise.resolve()).catch(() => undefined).then(task);
+    queues.set(gameId, next);
+    void next.finally(() => { if (queues.get(gameId) === next) queues.delete(gameId); }).catch(() => undefined);
+    return next;
+  };
+  const selection = createMetadataSelection({ db: options.db, getLibraryPath: options.getLibraryPath, now, parse: parseSourceData,
+    search: (source, query, signal) => source === 'vndb' ? searchVndb(query, signal, http) : searchBangumi(query, signal, http),
+    lookup: (source, id, signal) => lookupMetadata(source, id, signal, http),
+    download: (url, directory, signal) => download(url, directory, signal, http),
+  });
 
   const getSummary = (gameId: string): GameMetadataSummary => {
     const game = getGame(options.db, gameId);
@@ -598,7 +645,10 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
       coverSource: game.coverSource,
       sources: SOURCE_ORDER.map((source) => {
         const row = bySource.get(source);
-        return row ? toSummary(row, game.name) : emptySummary(source, game.name);
+        if (!row) return { ...emptySummary(source, game.name), revision: 0, candidates: [] };
+        return { ...toSummary(row, game.name), matchMethod: row.matchMethod, confirmedAt: row.confirmedAt,
+          revision: row.revision, searchError: row.searchError, imageUrl: row.imageUrl,
+          candidates: selection.candidatesFor(gameId, source, row.revision, parseSourceData(row).candidates) };
       }),
     };
   };
@@ -617,28 +667,39 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
     let completed = 0;
     request.onProgress?.({ phase: 'metadata', current: 0, total: sourcesToQuery.length, currentFile: game.name });
 
-    await Promise.all(sourcesToQuery.map(async (source) => {
+    const outcomes = await Promise.allSettled(sourcesToQuery.map(async (source) => {
       const timeout = childTimeout(request.signal, REQUEST_TIMEOUT_MS);
       try {
-        const candidates = source === 'vndb'
+        const previous = getGameSource(options.db, gameId, source);
+        const candidates = previous?.externalId && previous.status === 'matched'
+          ? [await lookupMetadata(source, previous.externalId, timeout.signal, http)]
+          : source === 'vndb'
           ? await searchVndb(queryName, timeout.signal, http)
           : await searchBangumi(queryName, timeout.signal, http);
-        const resolution = resolveCandidate(game.name, candidates);
-        upsertGameSource(options.db, sourceInput(gameId, source, queryName, resolution, nowIso(now)));
+        timeout.signal.throwIfAborted();
+        if (!getGame(options.db, gameId)) throw new Error('作品已删除。');
+        const resolution: CandidateResolution = previous?.externalId && previous.status === 'matched'
+          ? { status: 'matched', matched: candidates[0], candidates } : resolveCandidate(game.name, candidates);
+        upsertGameSource(options.db, { ...sourceInput(gameId, source, queryName, resolution, nowIso(now)),
+          matchMethod: previous?.matchMethod ?? (resolution.status === 'matched' ? 'auto' : null),
+          confirmedAt: previous?.confirmedAt ?? null, revision: (previous?.revision ?? 0) + 1 });
       } catch (error) {
-        if (isAbortError(error, request.signal)) throw error;
+        if (request.signal.aborted) throw error;
         const previous = getGameSource(options.db, gameId, source);
+        if (!getGame(options.db, gameId)) throw error;
         upsertGameSource(options.db, {
           gameId,
           source,
           externalId: previous?.externalId ?? null,
           queryName,
-          status: 'failed',
+          status: previous?.status === 'matched' ? 'matched' : 'failed',
           dataJson: previous?.dataJson ?? null,
           imageUrl: previous?.imageUrl ?? null,
           fetchedAt: nowIso(now),
           retryAfter: retryIso(now),
           errorMessage: error instanceof Error ? error.message : String(error),
+          matchMethod: previous?.matchMethod ?? null, confirmedAt: previous?.confirmedAt ?? null,
+          revision: previous?.revision ?? 0,
         });
       } finally {
         timeout.dispose();
@@ -646,6 +707,10 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
         request.onProgress?.({ phase: 'metadata', current: completed, total: sourcesToQuery.length, currentFile: game.name });
       }
     }));
+
+    if (request.signal.aborted) throw request.signal.reason ?? new Error('资料更新已取消。');
+    const rejected = outcomes.find(outcome => outcome.status === 'rejected');
+    if (rejected?.status === 'rejected') throw rejected.reason;
 
     await Promise.all(getGameSources(options.db, gameId).map(async (row) => {
       const timeout = childTimeout(request.signal, REQUEST_TIMEOUT_MS);
@@ -667,8 +732,10 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
       const libraryPathValue = await options.getLibraryPath();
       if (!libraryPathValue.trim()) throw new Error('Library path is not configured');
       const libraryPath = path.resolve(libraryPathValue);
+      const indexedLibrary = getSetting(options.db, LIBRARY_INDEX_PATH) === libraryPathValue;
       const targetDirectory = assertWithin(
-        refreshedGame.folderPath && refreshedGame.folderPath.trim()
+        indexedLibrary ? path.join(libraryPath, `.natsume-auto-cover-${randomUUID()}`)
+        : refreshedGame.folderPath && refreshedGame.folderPath.trim()
           ? refreshedGame.folderPath
           : path.join(libraryPath, sanitizeDirectoryName(refreshedGame.name)),
         libraryPath,
@@ -680,9 +747,11 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
         request.onProgress?.({ phase: 'cover', current: 0, total: 1, currentFile: refreshedGame.name });
         try {
           const localPath = await download(preferred.matched.imageUrl!, targetDirectory, request.signal, http);
+          if (request.signal.aborted || !getGame(options.db, gameId)) { await rm(localPath, { force: true }); request.signal.throwIfAborted(); throw new Error('作品已删除。'); }
           const previousCover = refreshedGame.coverPath;
           setGameCover(options.db, gameId, localPath, preferred.row.source);
-          if (previousCover && isAutomaticCover(refreshedGame.coverSource) && previousCover !== localPath && assertWithin(previousCover, libraryPath)) {
+          if (previousCover && isAutomaticCover(refreshedGame.coverSource) && previousCover !== localPath && assertWithin(previousCover, libraryPath)
+            && (!indexedLibrary || /^\.natsume-auto-cover-[0-9a-f-]{36}$/i.test(path.basename(path.dirname(previousCover))))) {
             await rm(previousCover, { force: true }).catch(() => undefined);
           }
         } catch (error) {
@@ -771,10 +840,14 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
   };
 
   return {
-    ensure,
+    ensure: (gameId, request) => withGameLock(gameId, () => ensure(gameId, request)),
     getSummary,
-    refresh: (gameId, signal = new AbortController().signal) => ensure(gameId, { signal, force: true }),
-    selectCandidate,
-    translateSummary,
+    refresh: (gameId, signal = new AbortController().signal) => withGameLock(gameId, () => ensure(gameId, { signal, force: true })),
+    search: (gameId, source, query) => withGameLock(gameId, () => selection.search(gameId, source, query)),
+    lookup: (gameId, source, input) => withGameLock(gameId, () => selection.lookup(gameId, source, input)),
+    selectCandidate: (gameId, source, externalId, signal) => withGameLock(gameId, () => selectCandidate(gameId, source, externalId, signal)),
+    translateSummary: (gameId, source, signal) => withGameLock(gameId, () => translateSummary(gameId, source, signal)),
+    prepareUpdate: selection.prepareUpdate,
+    withGameLock,
   };
 }

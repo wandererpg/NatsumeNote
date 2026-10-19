@@ -12,6 +12,7 @@ type ScanPhase = 'idle' | 'running' | 'completed' | 'error';
 export interface ScanDialogProps {
   onClose: () => void;
   onCompleted?: (result: ScanResult) => void | Promise<void>;
+  onSelectMetadata?: (gameId: string) => void | Promise<void>;
   defaultDeepScan?: boolean;
 }
 
@@ -34,7 +35,7 @@ function toScanError(error: unknown): string {
   return error instanceof Error ? error.message : '导入失败，请稍后重试。';
 }
 
-export function ScanDialog({ onClose, onCompleted, defaultDeepScan = true }: ScanDialogProps) {
+export function ScanDialog({ onClose, onCompleted, onSelectMetadata, defaultDeepScan = true }: ScanDialogProps) {
   const [sourcePath, setSourcePath] = useState('');
   const [gameName, setGameName] = useState('');
   const [deepScan, setDeepScan] = useState(defaultDeepScan);
@@ -172,7 +173,7 @@ export function ScanDialog({ onClose, onCompleted, defaultDeepScan = true }: Sca
         </header>
 
         {phase === 'completed' && result ? (
-          <ScanResultView result={result} onClose={onClose} onRetry={() => { setPhase('idle'); setResult(null); setProgress(null); }} />
+          <ScanResultView result={result} onClose={onClose} onSelectMetadata={onSelectMetadata} onRetry={() => { setPhase('idle'); setResult(null); setProgress(null); }} />
         ) : (
           <>
             <div className="scan-dialog__body">
@@ -209,14 +210,14 @@ export function ScanDialog({ onClose, onCompleted, defaultDeepScan = true }: Sca
               <label className="scan-dialog__check">
                 <input type="checkbox" checked={deepScan} onChange={(event) => setDeepScan(event.target.checked)} disabled={phase === 'running'} />
                 <span className="scan-dialog__check-mark"><Check size={12} aria-hidden="true" /></span>
-                <span><strong>深度扫描归档</strong><small>自动调用 GARbro 读取 .xp3 / .rpa / .arc / .pak，以及 SM2MPX/WMSC 音乐容器</small></span>
+                <span><strong>深度扫描归档</strong><small>读取 .afa / .xp3 / .rpa / .arc / .pak，支持 BGI 无扩展名音频和 SM2MPX/WMSC 音乐容器</small></span>
                 <ChevronDown size={14} className="scan-dialog__check-chevron" aria-hidden="true" />
               </label>
 
               <label className="scan-dialog__check">
                 <input type="checkbox" checked={includeVoice} onChange={(event) => setIncludeVoice(event.target.checked)} disabled={phase === 'running'} />
                 <span className="scan-dialog__check-mark"><Check size={12} aria-hidden="true" /></span>
-                <span><strong>导入语音</strong><small>{hasValidVoiceThreshold ? `${voiceThresholdSeconds} 秒` : '阈值'}及以下或无法识别时长的音频会归为语音；VOICE1/VOICE2 默认不导入</small></span>
+                <span><strong>导入语音</strong><small>{hasValidVoiceThreshold ? `${voiceThresholdSeconds} 秒` : '阈值'}及以下或无法识别时长的音频会归为语音；VOICE1/VOICE2 和 *Voice.afa 默认不导入</small></span>
               </label>
 
               {phase === 'running' && <ScanProgressView progress={progress} />}

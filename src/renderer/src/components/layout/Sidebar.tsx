@@ -9,11 +9,13 @@ import {
 
 import type { Game, LibrarySection, Playlist } from '../../../../shared/types';
 import { GameList } from '../library/GameList';
+import { useSelectionIndicator } from '../../hooks/useSelectionIndicator';
 
 export type SidebarSection = LibrarySection;
 
 export interface SidebarProps {
   games: Game[];
+  showGames?: boolean;
   playlists?: Playlist[];
   selectedGameId?: string | null;
   selectedPlaylistId?: string | null;
@@ -35,6 +37,7 @@ const sections: Array<{ id: SidebarSection; label: string; Icon: typeof Library 
 
 export function Sidebar({
   games,
+  showGames = true,
   playlists = [],
   selectedGameId = null,
   selectedPlaylistId = null,
@@ -46,17 +49,19 @@ export function Sidebar({
   onSelectSection,
   onImport,
 }: SidebarProps) {
+  const indicator = useSelectionIndicator(selectedGameId ? null : activeSection);
   return (
     <aside className="sidebar" data-testid="sidebar">
       <div className="sidebar__scroll">
-        <nav className="sidebar__nav" aria-label="音乐库导航">
+        <nav className="sidebar__nav" aria-label="音乐库导航" ref={indicator.ref}>
+          <span className="selection-indicator" aria-hidden="true" style={indicator.style} />
           {sections.map(({ id, label, Icon }) => (
             <button
-              className={`sidebar__nav-item${activeSection === id ? ' is-active' : ''}`}
+              className={`sidebar__nav-item${activeSection === id && !selectedGameId ? ' is-active' : ''}`}
               type="button"
               key={id}
               data-testid={`sidebar-nav-${id}`}
-              aria-current={activeSection === id ? 'page' : undefined}
+              aria-current={activeSection === id && !selectedGameId ? 'page' : undefined}
               onClick={() => onSelectSection?.(id)}
             >
               <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
@@ -98,12 +103,12 @@ export function Sidebar({
           </div>
         ) : (
           <>
-            <div className="sidebar__section-heading">
+            {showGames && <div className="sidebar__section-heading">
               <span>我的游戏</span>
               <span className="sidebar__section-rule" aria-hidden="true" />
               <span className="sidebar__game-count">{games.length.toString().padStart(2, '0')}</span>
-            </div>
-            <GameList games={games} selectedGameId={selectedGameId} onSelectGame={onSelectGame} onEditGame={onEditGame} />
+            </div>}
+            {showGames && <GameList games={games} selectedGameId={selectedGameId} onSelectGame={onSelectGame} onEditGame={onEditGame} />}
           </>
         )}
       </div>

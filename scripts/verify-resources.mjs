@@ -60,7 +60,7 @@ export async function verifyResources(resourceRoot = parseRoot(process.argv.slic
         ? `GARbro.exe is missing or empty: ${filePath}`
         : `Missing or empty file: ${filePath}`),
       '',
-      'Supply the complete licensed GARbro bundle and NatsumeNote extraction bridges under:',
+      'Supply the complete licensed GARbro bundle and NatsumeMusic extraction bridges under:',
       `  ${path.dirname(garbroPath)}`,
       'or pass --root <resources-root> (or GALMUSIC_RESOURCE_ROOT) for a staging/fixture directory.',
     ];

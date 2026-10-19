@@ -27,6 +27,7 @@ export interface TrackTableProps {
   onSelectionChange?: (next: Set<string>) => void;
   selectionDisabled?: boolean;
   scrollContainerRef?: RefObject<HTMLElement | null>;
+  scrollResetKey?: string;
 }
 
 export function TrackTable({
@@ -47,6 +48,7 @@ export function TrackTable({
   onSelectionChange,
   selectionDisabled = false,
   scrollContainerRef,
+  scrollResetKey,
 }: TrackTableProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
@@ -116,11 +118,14 @@ export function TrackTable({
   }, [scrollContainerRef]);
 
   useEffect(() => {
+    lastSelectionIndexRef.current = null;
+  }, [trackOrderKey]);
+
+  useEffect(() => {
     const scrollTarget = scrollContainerRef?.current ?? scrollerRef.current;
     if (scrollTarget) scrollTarget.scrollTop = 0;
     setScrollTop(0);
-    lastSelectionIndexRef.current = null;
-  }, [scrollContainerRef, trackOrderKey]);
+  }, [scrollContainerRef, scrollResetKey]);
 
   const toggleAllTracks = () => {
     if (selectionDisabled || !onSelectionChange) return;
@@ -188,10 +193,10 @@ export function TrackTable({
               </th>
             )}
             <th scope="col" className="track-table__index">#</th>
-            <th scope="col">曲目</th>
-            <th scope="col">格式</th>
-            <th scope="col">时长</th>
-            <th scope="col">大小</th>
+            <th scope="col" className="track-table__title">曲目</th>
+            <th scope="col" className="track-table__format">格式</th>
+            <th scope="col" className="track-table__duration">时长</th>
+            <th scope="col" className="track-table__size">大小</th>
             <th scope="col" className="track-table__actions"><span className="sr-only">操作</span></th>
           </tr>
         </thead>
