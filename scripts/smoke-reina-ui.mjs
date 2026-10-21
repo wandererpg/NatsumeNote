@@ -30,6 +30,9 @@ try {
     if (mode.startsWith('batch')) {
       await window.webContents.executeJavaScript("[...document.querySelectorAll('button')].find(b=>b.textContent.includes('预览并导入全部作品')).click()");
       await new Promise(resolve => setTimeout(resolve, 150));
+      if (mode === 'batch') {
+        await window.webContents.executeJavaScript("(async () => { const confirm=[...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('确认导入')); if (!confirm || confirm.disabled) throw new Error('Batch confirmation must explain pending matches when clicked'); confirm.click(); await new Promise(resolve=>setTimeout(resolve,50)); const alert=document.querySelector('.reina-batch [role=alert]'); const selected=document.activeElement; if (!alert?.textContent.includes('手动确认') || selected?.dataset.externalGameId !== '1') throw new Error('Batch confirmation did not explain and focus pending match'); })()");
+      }
       await window.webContents.executeJavaScript("document.querySelector('.reina-batch').scrollIntoView({block:'start'})");
     }
     const result = await window.webContents.executeJavaScript("({width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth,text:document.body.innerText,buttons:document.querySelectorAll('button').length})");
