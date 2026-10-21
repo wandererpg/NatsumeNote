@@ -25,7 +25,7 @@ void app.whenReady().then(async () => {
   const before = hash();
   const db = new Database(path.join(folder, 'galmusic.db')); migrate(db);
   db.prepare('INSERT INTO games(id,name) VALUES (?,?)').run('local', 'Synthetic game');
-  const worker = new ReinaQueryProcess(3000, path.join(root, 'out/main/reina-query.js'));
+  const worker = new ReinaQueryProcess(3000, process.env.REINA_SMOKE_WORKER || path.join(root, 'out/main/reina-query.js'));
   const service = new ReinaService(db, worker);
   try {
     const connection = await service.connectSelectedFile(sourcePath);
