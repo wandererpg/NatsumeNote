@@ -20,8 +20,8 @@ const copy = {
   minimize: '\u6700\u5c0f\u5316',
   maximize: '\u6700\u5927\u5316',
   close: '\u5173\u95ed',
-  searchLabel: '搜索作品或曲目',
-  searchPlaceholder: '搜索作品或曲目',
+  searchLabel: '搜索作品',
+  searchPlaceholder: '搜索作品',
 };
 
 function windowAction(name: 'minimizeWindow' | 'toggleMaximizeWindow' | 'closeWindow'): void {
@@ -66,7 +66,7 @@ export function TitleBar({
         </div>
         <div className="brand-lockup">
             <span className="brand-lockup__name">NatsumeNote</span>
-          <span className="brand-lockup__hint">游戏原声收藏馆</span>
+          <span className="brand-lockup__hint">游戏记忆珍藏</span>
         </div>
       </div>
 

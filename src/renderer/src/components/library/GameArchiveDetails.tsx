@@ -35,7 +35,7 @@ export function GameArchiveDetails({ source }: GameArchiveDetailsProps) {
   const provider = source.source === 'vndb' ? 'VNDB' : 'Bangumi';
 
   return (
-    <section className="game-archive-details" aria-label="人物与制作资料">
+    <section className="game-archive-details" aria-label="人物介绍与制作资料">
       {characters.length > 0 && (
         <div className="game-archive-details__characters">
           <header className="game-archive-details__heading">

@@ -29,7 +29,7 @@ export interface SidebarProps {
 }
 
 const sections: Array<{ id: SidebarSection; label: string; Icon: typeof Library }> = [
-  { id: 'library', label: '全部音乐', Icon: Library },
+  { id: 'library', label: '全部作品', Icon: Library },
   { id: 'recent', label: '最近添加', Icon: Clock3 },
   { id: 'favorites', label: '收藏', Icon: Heart },
   { id: 'playlists', label: '播放列表', Icon: ListMusic },
@@ -116,7 +116,7 @@ export function Sidebar({
       <div className="sidebar__footer">
         <button className="import-button" type="button" aria-label="从文件夹导入" onClick={onImport}>
           <span className="import-button__icon"><FolderPlus size={16} strokeWidth={1.8} aria-hidden="true" /></span>
-          <span>导入游戏音乐</span>
+          <span>导入游戏数据</span>
           <Plus className="import-button__plus" size={15} strokeWidth={1.8} aria-hidden="true" />
         </button>
       </div>

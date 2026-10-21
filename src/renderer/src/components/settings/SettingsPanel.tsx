@@ -134,7 +134,7 @@ export function SettingsPanel({ settings, onClose, onSelectFolder, onSelectBackg
   return (
     <div className="modal-backdrop" role="presentation">
       <section ref={dialogRef} className="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title" tabIndex={-1} data-testid="settings-panel">
-        <header className="settings-panel__header"><div><p className="eyebrow">MAKE IT YOURS</p><h2 id="settings-title">设置</h2><p className="settings-panel__intro">整理音乐，也调整属于你的聆听空间。</p></div><button className="icon-button" type="button" aria-label="关闭设置" onClick={() => void cancel()} disabled={isSaving || isCancelling || isSyncing}><X size={18} aria-hidden="true" /></button></header>
+        <header className="settings-panel__header"><div><p className="eyebrow">MAKE IT YOURS</p><h2 id="settings-title">设置</h2><p className="settings-panel__intro"></p></div><button className="icon-button" type="button" aria-label="关闭设置" onClick={() => void cancel()} disabled={isSaving || isCancelling || isSyncing}><X size={18} aria-hidden="true" /></button></header>
         <div className="settings-panel__body">
           <section className="settings-group" aria-labelledby="settings-library-title">
           <div className="settings-group__heading"><FolderOpen size={18} aria-hidden="true" /><h3 id="settings-library-title">音乐库</h3></div>
