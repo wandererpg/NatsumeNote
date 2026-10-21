@@ -107,6 +107,55 @@
   color: var(--teal-0);
 }
 
+.reina-database-help {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.reina-database-help .reina-hint,
+.reina-database-help code {
+  font-size: 12px;
+}
+
+.reina-database-paths {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.reina-database-paths dt {
+  color: var(--paper-0);
+  font-weight: 600;
+}
+
+.reina-database-paths dd {
+  margin: 2px 0 0;
+  color: var(--teal-0);
+  overflow-wrap: anywhere;
+}
+
+.reina-database-development {
+  color: var(--muted-1);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.reina-database-development summary {
+  cursor: pointer;
+}
+
+.reina-database-development summary:focus-visible {
+  outline: 2px solid var(--teal-0);
+  outline-offset: 3px;
+}
+
+.reina-database-development[open] summary {
+  margin-bottom: 6px;
+}
+
 .reina-status {
   margin: 0;
   padding: 7px 10px;

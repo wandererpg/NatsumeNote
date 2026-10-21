@@ -183,6 +183,7 @@ export function ReinaConnectionPanel() {
         <button
           className="button button--primary"
           type="button"
+          aria-describedby="reina-database-location"
           onClick={() => void connect()}
           disabled={!bridgeReady || connecting || Boolean(busy)}
         >
@@ -204,9 +205,32 @@ export function ReinaConnectionPanel() {
         </button>
       </div>
 
-      <p className="reina-hint">
-        通过系统文件选择器指定 <code>reina_manager.db</code>；安装版与便携版的数据目录不同，请按实际安装位置选择。取消选择不会产生错误。
-      </p>
+      <div className="reina-database-help">
+        <p className="reina-hint" id="reina-database-location">
+          <strong>数据库在哪里？</strong> 请选择 ReinaManager 正在使用的 <code>reina_manager.db</code>。
+        </p>
+        <dl className="reina-database-paths">
+          <div>
+            <dt>Windows 安装版</dt>
+            <dd><code>{'%APPDATA%\\com.reinamanager.dev\\data\\reina_manager.db'}</code></dd>
+          </div>
+          <div>
+            <dt>便携版</dt>
+            <dd><code>{'<ReinaManager.exe 所在目录>\\resources\\data\\reina_manager.db'}</code></dd>
+          </div>
+        </dl>
+        <p className="reina-hint">
+          安装版可按 Win + R，输入 <code>{'%APPDATA%\\com.reinamanager.dev\\data'}</code> 后回车，
+          找到数据库；也可以将该文件夹路径粘贴到文件选择窗口的地址栏。便携版可右键快捷方式，选择“打开文件所在的位置”，再进入 resources → data。
+        </p>
+        <details className="reina-database-development">
+          <summary>使用 ReinaManager 开发版？</summary>
+          <p className="reina-hint">
+            开发版使用独立数据库：<code>{'%APPDATA%\\com.reinamanager.dev.debug\\data\\reina_manager.db'}</code>。
+          </p>
+        </details>
+        <p className="reina-hint">若找不到文件，请确认已启动并使用过对应版本的 ReinaManager。选择文件后仅只读连接，取消选择不会创建连接。</p>
+      </div>
 
       {statusMessage && (
         <p className="reina-status" role="status">
@@ -235,7 +259,7 @@ export function ReinaConnectionPanel() {
         <div className="reina-empty">
           <p>尚未连接 ReinaManager。</p>
           <p className="reina-hint">
-            选择其 <code>{'<便携版目录>/resources/data/reina_manager.db'}</code> 后会以只读方式读取；连接信息只保存在本机。
+            按上方位置找到数据库后，点击“选择 ReinaManager 数据库…”；连接信息只保存在本机。
           </p>
         </div>
       ) : (

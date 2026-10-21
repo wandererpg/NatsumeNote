@@ -13,6 +13,20 @@
 
 取消文件选择不会产生连接。解绑作品或断开来源只清理 NatsumeNote 的关联及对应标签缓存，保留音乐、手账卡片和 ReinaManager 数据。重启后已确认的关联仍然存在。来源文件被替换后，可通过系统选择器重新选择原路径：保留 sourceId 与旧关联，但清除外部标签缓存并暂停旧关联读取。作品概览会提示先解除旧关联、再搜索确认，避免把旧作品编号自动套用到新库。路径改变时作为新的来源连接，不会自动搬迁旧关联。
 
+## 数据库在哪里（Windows）
+
+设置中的“数据连接”会直接显示以下位置与查找步骤：
+
+| ReinaManager 版本 | 数据库位置 |
+| --- | --- |
+| 安装版 | `%APPDATA%\com.reinamanager.dev\data\reina_manager.db` |
+| 便携版 | `<ReinaManager.exe 所在目录>\resources\data\reina_manager.db` |
+| 开发版 | `%APPDATA%\com.reinamanager.dev.debug\data\reina_manager.db` |
+
+安装版可按 **Win + R**，输入 `%APPDATA%\com.reinamanager.dev\data` 后回车；也可以把该文件夹路径粘贴到选择数据库窗口的地址栏，再选中 `reina_manager.db`。`%APPDATA%` 会指向当前 Windows 用户的 `AppData\Roaming` 文件夹。
+
+便携版可右键 ReinaManager 快捷方式，选择“打开文件所在的位置”，再进入 `resources\data`。若文件不存在，先确认已启动并使用过对应版本。以上规则已核对 ReinaManager 的 `reina-path/src/paths.rs` 与 `runtime.rs`，不同旧版本仍应以实际使用的文件为准。
+
 ## 如何理解时长
 
 - **来源总计**：ReinaManager 保存的生命周期累计分钟和次数，可能经过历史修正；不受当前日期范围影响。缺失值显示为来源未提供。
