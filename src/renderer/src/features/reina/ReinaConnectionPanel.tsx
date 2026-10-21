@@ -64,7 +64,7 @@ export function ReinaConnectionPanel() {
       if (source) notifyReinaTagsChanged();
       if (!mountedRef.current) return;
       if (source) {
-        setStatusMessage(`已连接 ${source.label || 'ReinaManager 数据库'}。`);
+        setStatusMessage(`已连接 ${source.label || 'ReinaManager 数据库'}。下一步：打开作品概览 → 游玩记录，浏览来源作品并确认关联，即可读取历史时长。`);
         await reload();
       } else {
         setStatusMessage('已取消选择数据库，未创建连接。');
@@ -204,6 +204,12 @@ export function ReinaConnectionPanel() {
           刷新来源
         </button>
       </div>
+
+      {sources && sources.length > 0 && (
+        <p className="reina-notice">
+          连接完成后，请打开对应作品的「概览 → 游玩记录」，点击「浏览全部来源作品」，核对历史时长后关联。连接数据库不会自动匹配作品，标题不同也可以手动选择。
+        </p>
+      )}
 
       <div className="reina-database-help">
         <p className="reina-hint" id="reina-database-location">

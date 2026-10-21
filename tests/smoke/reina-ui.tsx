@@ -19,7 +19,7 @@ Object.defineProperty(window, 'galMusic', { value: {
     return mode === 'empty' ? [] : [source];
   },
   reinaLinks: async () => mode === 'connected' ? [{ localGameId: 'local', sourceId: source.id, externalGameId: 42, externalName: name }] : [],
-  reinaQuery: async (tool: string) => envelope(tool === 'reina_get_stats' ? stats : tool === 'reina_list_sessions' ? sessions : tool === 'reina_get_connection' ? { readable: true, liveSession: false, schemaProfile: 'synthetic-audited' } : []),
+  reinaQuery: async (tool: string) => envelope(tool === 'reina_get_stats' ? stats : tool === 'reina_list_sessions' ? sessions : tool === 'reina_get_connection' ? { readable: true, liveSession: false, schemaProfile: 'synthetic-audited' } : tool === 'reina_list_games' ? [{ id: 42, name, externalIds: [], tags, unsupportedTagProviders: [] }] : []),
   reinaConnect: async () => source,
   reinaDisconnect: async () => {},
   reinaBind: async () => {},

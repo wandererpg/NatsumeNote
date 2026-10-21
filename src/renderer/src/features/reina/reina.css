@@ -618,6 +618,26 @@
   gap: 8px;
 }
 
+.reina-history-preview {
+  flex-basis: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.reina-history-preview h4 {
+  margin: 0;
+  color: var(--paper-0);
+  font-size: 12px;
+}
+
+.reina-history-preview .reina-history-preview__total {
+  color: var(--paper-0);
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- game panel: play history ---------- */
 
 .reina-play__header {

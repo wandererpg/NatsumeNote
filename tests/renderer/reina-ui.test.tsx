@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ReinaGamePanel } from '../../src/renderer/src/features/reina/ReinaGamePanel';
+import { ReinaHistoryPreview } from '../../src/renderer/src/features/reina/ReinaHistoryPreview';
 import { TagChips } from '../../src/renderer/src/features/reina/TagChips';
 import { useReinaSessions } from '../../src/renderer/src/features/reina/useReinaSessions';
 import type {
@@ -218,7 +219,104 @@ describe('useReinaSessions', () => {
   });
 });
 
+describe('ReinaHistoryPreview', () => {
+  it('keeps lifetime totals even when no detailed sessions are available', async () => {
+    installBridge({ reinaQuery: vi.fn().mockResolvedValue(envelope(makeStats({ sessionCount: 0, sessionTotalMinutes: 0 }))) });
+    render(<ReinaHistoryPreview sourceId={source.id} gameId={42} />);
+    expect(await screen.findByText('100 小时')).toBeInTheDocument();
+    expect(screen.getByText(/已保存会话合计 0 分钟/)).toBeInTheDocument();
+  });
+
+  it('retries failures and shows missing lifetime totals as unavailable', async () => {
+    const query = vi.fn()
+      .mockRejectedValueOnce(new Error('数据库暂忙'))
+      .mockResolvedValueOnce(envelope(makeStats({ sourceTotalMinutes: null, sourceSessionCount: null })));
+    installBridge({ reinaQuery: query });
+    render(<ReinaHistoryPreview sourceId={source.id} gameId={42} />);
+    expect(await screen.findByText('数据库暂忙')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重试预览' }));
+    expect(await screen.findByText('来源未提供')).toBeInTheDocument();
+    expect(screen.getByText('来源未提供记录次数')).toBeInTheDocument();
+    expect(screen.queryByText('0 分钟')).not.toBeInTheDocument();
+  });
+
+  it('discards a late preview after switching games', async () => {
+    let resolveOld: (value: ReinaEnvelope<ReinaStats>) => void = () => undefined;
+    const pending = new Promise<ReinaEnvelope<ReinaStats>>((resolve) => { resolveOld = resolve; });
+    installBridge({ reinaQuery: vi.fn().mockImplementation(async (_tool: string, input: { gameId: number }) => (
+      input.gameId === 42 ? pending : envelope(makeStats({ sourceTotalMinutes: 60 }))
+    )) });
+    const view = render(<ReinaHistoryPreview key="42" sourceId={source.id} gameId={42} />);
+    expect(screen.getByText('正在预览历史时长…')).toBeInTheDocument();
+    view.rerender(<ReinaHistoryPreview key="43" sourceId={source.id} gameId={43} />);
+    expect(await screen.findByText('1 小时')).toBeInTheDocument();
+    await act(async () => { resolveOld(envelope(makeStats())); });
+    expect(screen.queryByText('100 小时')).not.toBeInTheDocument();
+    expect(screen.getByText('1 小时')).toBeInTheDocument();
+  });
+});
+
 describe('ReinaGamePanel', () => {
+  it('browses differently named source games, previews lifetime totals and reads history only after confirmation', async () => {
+    const candidate: ReinaGame = {
+      id: 42, name: '来源中的日文标题', externalIds: [], tags: [], unsupportedTagProviders: [],
+    };
+    const links: ReinaLink[] = [];
+    const bind = vi.fn().mockImplementation(async (link: ReinaLink) => { links.push(link); });
+    const api = makeGameApi({
+      reinaLinks: vi.fn().mockImplementation(async () => [...links]),
+      reinaBind: bind,
+      reinaQuery: vi.fn().mockImplementation(async (tool: string, input: { query?: string }) => {
+        if (tool === 'reina_list_games') return envelope(input.query ? [] : [candidate]);
+        if (tool === 'reina_get_stats') return envelope(makeStats());
+        return envelope([makeSession(1)]);
+      }),
+    });
+    installBridge(api);
+    render(<ReinaGamePanel gameId="game-1" gameName="本地中文文件夹名" />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'ReinaManager 来源' })).toHaveValue(source.id));
+    expect(await screen.findByText(/数据库已连接，此作品尚未关联/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: '搜索候选' }));
+    expect(await screen.findByText(/没有找到匹配的游戏/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '浏览全部来源作品' }));
+    fireEvent.click(await screen.findByRole('radio', { name: /来源中的日文标题/ }));
+    const preview = await screen.findByRole('region', { name: '历史时长预览' });
+    expect(await within(preview).findByText('100 小时')).toBeInTheDocument();
+    expect(within(preview).getByText(/来源记录 80 次/)).toBeInTheDocument();
+    expect(bind).not.toHaveBeenCalled();
+    expect(api.reinaQuery.mock.calls.some(([tool]) => tool === 'reina_list_sessions')).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '关联此作品' }));
+    expect(await screen.findByText(/已关联《来源中的日文标题》/)).toBeInTheDocument();
+    const stats = await screen.findByRole('group', { name: '游玩统计（两种口径）' });
+    expect(within(stats).getByText('100 小时')).toBeInTheDocument();
+    await waitFor(() => expect(api.reinaQuery).toHaveBeenCalledWith('reina_list_sessions', expect.objectContaining({ gameId: 42 })));
+  });
+
+  it('keeps browsing pagination and retry independent of edited search fields', async () => {
+    const candidate: ReinaGame = { id: 42, name: '来源作品', externalIds: [], tags: [], unsupportedTagProviders: [] };
+    let fail = true;
+    const query = vi.fn().mockImplementation(async (_tool: string, input: { cursor?: string }) => {
+      if (fail) { fail = false; throw new Error('来源忙，请重试'); }
+      return envelope(input.cursor ? [{ ...candidate, id: 43, name: '下一页作品' }] : [candidate], { nextCursor: input.cursor ? null : 'next-page' });
+    });
+    installBridge(makeGameApi({ reinaQuery: query }));
+    render(<ReinaGamePanel gameId="game-1" gameName="本地文件夹" />);
+    fireEvent.click(await screen.findByRole('button', { name: '浏览全部来源作品' }));
+    expect(await screen.findByText('来源忙，请重试')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: '搜索方式' }), { target: { value: 'vndb' } });
+    // Empty VNDB input must not prevent retrying a previous browse request.
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    await screen.findByRole('radio', { name: /来源作品/ });
+    fireEvent.click(screen.getByRole('button', { name: '加载更多候选' }));
+    await screen.findByRole('radio', { name: /下一页作品/ });
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+    expect(query.mock.calls.map(([, input]) => input)).toEqual([
+      { sourceId: source.id, limit: 20 },
+      { sourceId: source.id, limit: 20 },
+      { sourceId: source.id, limit: 20, cursor: 'next-page' },
+    ]);
+  });
+
   it('discards a late links response after the game changes', async () => {
     let resolveFirst: (links: ReinaLink[]) => void = () => undefined;
     const first = new Promise<ReinaLink[]>((resolve) => {

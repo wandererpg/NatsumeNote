@@ -10,11 +10,12 @@ import {
   Search,
   Unlink,
 } from 'lucide-react';
-import type { ReinaGame, ReinaLink } from '../../../../shared/reina';
+import type { ReinaGame, ReinaLink, ReinaQuery } from '../../../../shared/reina';
 import type { GameMetadataSummary } from '../../../../shared/types';
 import { getReinaBridge, hasBridgeMethod, reinaErrorMessage, type ReinaBridge } from './reina-bridge';
 import { useReinaSources } from './useReinaSources';
 import { useReinaSessions } from './useReinaSessions';
+import { ReinaHistoryPreview } from './ReinaHistoryPreview';
 import { asReinaList, mergeGames, mergeWarnings } from './reina-data';
 import {
   dayStartIso,
@@ -130,6 +131,7 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
   const linksRequestRef = useRef(0);
   const searchRequestRef = useRef(0);
   const searchPendingRef = useRef(false);
+  const lastSearchRef = useRef<{ query: ReinaQuery; label: string } | null>(null);
   const autoSelectedRef = useRef(false);
   const gameIdRef = useRef(gameId);
   const sourceIdRef = useRef(sourceId);
@@ -243,6 +245,7 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
   useEffect(() => {
     searchRequestRef.current += 1;
     searchPendingRef.current = false;
+    lastSearchRef.current = null;
     setCandidates(null);
     setSearchState(emptySearchState());
     setSelectedCandidate(null);
@@ -310,7 +313,7 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
     ? `（读取于 ${formatDateTime(play.fetchedAt) ?? play.fetchedAt}）`
     : '';
 
-  const searchCandidates = async (cursor: string | null = null) => {
+  const searchCandidates = async (cursor: string | null = null, browseAll = false, retry = false) => {
     if (searchPendingRef.current) return;
     if (!sourceId) {
       setActionError('请先选择数据来源。');
@@ -323,16 +326,17 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
     }
     const trimmedQuery = searchQuery.trim();
     const trimmedExternal = externalId.trim();
-    if (searchMode === 'name' && trimmedQuery.length > 200) {
+    const reuseSearch = (cursor !== null || retry) && lastSearchRef.current !== null;
+    if (!reuseSearch && !browseAll && searchMode === 'name' && trimmedQuery.length > 200) {
       setActionError('搜索关键词不能超过 200 个字符。');
       return;
     }
-    if (searchMode !== 'name' && trimmedExternal === '') {
+    if (!reuseSearch && !browseAll && searchMode !== 'name' && trimmedExternal === '') {
       setActionError(`请输入 ${providerLabel(searchMode)} 资料 ID。`);
       return;
     }
 
-    const searchLabel = searchMode === 'name'
+    const searchLabel = browseAll ? '全部来源作品' : searchMode === 'name'
       ? `名称「${trimmedQuery || '（空）'}」`
       : `${providerLabel(searchMode)} ID「${trimmedExternal}」`;
 
@@ -351,14 +355,16 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
       error: null,
     }));
 
-    const query = searchMode === 'name'
+    const query: ReinaQuery = browseAll ? { sourceId, limit: CANDIDATE_PAGE_SIZE } : searchMode === 'name'
       ? { sourceId, query: trimmedQuery || undefined, limit: CANDIDATE_PAGE_SIZE }
       : { sourceId, externalId: trimmedExternal, provider: searchMode, limit: CANDIDATE_PAGE_SIZE };
+    const search = reuseSearch && lastSearchRef.current ? lastSearchRef.current : { query, label: searchLabel };
+    lastSearchRef.current = search;
 
     try {
       const envelope = await bridge.reinaQuery<ReinaGame[]>(
         'reina_list_games',
-        cursor ? { ...query, cursor } : query,
+        cursor ? { ...search.query, cursor } : search.query,
       );
       if (!isCurrent()) return;
       const games = asReinaList<ReinaGame>(envelope.data, 'games');
@@ -371,7 +377,7 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
         nextCursor: envelope.nextCursor ?? null,
         fetchedAt: envelope.fetchedAt || null,
         loaded: true,
-        searchedFor: searchLabel,
+        searchedFor: search.label,
       });
       if (cursor === null) setSelectedCandidate(null);
     } catch (searchError) {
@@ -534,7 +540,7 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
               </select>
             </label>
             {!boundLink && !linksLoading && !linksError && (
-              <p className="reina-hint">此来源尚未关联本作品，关联后才会读取来源已保存的统计与会话。</p>
+              <p className="reina-hint">数据库已连接，此作品尚未关联。请选择对应的来源作品，确认后即可读取已有历史时长；连接数据库不会自动匹配作品。</p>
             )}
           </>
         ) : (
@@ -622,6 +628,15 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
             </div>
           ) : (
             <div className="reina-search">
+              <button
+                className="button button--ghost button--small"
+                type="button"
+                onClick={() => void searchCandidates(null, true)}
+                disabled={searchState.loading || searchState.loadingMore || binding}
+              >
+                浏览全部来源作品
+              </button>
+              <p className="reina-hint">两边标题、译名或文件夹名不同？直接浏览全部来源作品，选中后先核对历史时长。</p>
               <div className="reina-search__fields">
                 <label className="reina-field reina-field--grow">
                   <span>搜索 ReinaManager 游戏</span>
@@ -682,7 +697,7 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
               {searchState.error && (
                 <div className="reina-error" role="alert">
                   <span>{searchState.error}</span>
-                  <button className="reina-link-button" type="button" onClick={() => void searchCandidates()}>
+                  <button className="reina-link-button" type="button" onClick={() => void searchCandidates(null, false, true)}>
                     重试
                   </button>
                 </div>
@@ -709,7 +724,7 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
                 </p>
               ) : candidates === null ? null : candidates.length === 0 ? (
                 <p className="reina-empty">
-                  没有找到匹配的游戏。可以换用资料 ID 搜索，或先在 ReinaManager 中确认作品标题。
+                  没有找到匹配的游戏。请点击「浏览全部来源作品」核对不同译名，也可以换用资料 ID 搜索。
                 </p>
               ) : (
                 <ul className="reina-candidates" role="radiogroup" aria-label="ReinaManager 游戏候选">
@@ -797,6 +812,13 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
                       ? `已选择《${selectedCandidate.name}》（Reina #${selectedCandidate.id}）`
                       : '尚未选择候选作品。'}
                   </p>
+                  {selectedCandidate && (
+                    <ReinaHistoryPreview
+                      key={`${sourceId}:${selectedCandidate.id}`}
+                      sourceId={sourceId}
+                      gameId={selectedCandidate.id}
+                    />
+                  )}
                   <div className="reina-confirm__actions">
                     <button
                       className="button button--primary"
