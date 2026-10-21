@@ -23,6 +23,20 @@ const metadata: GameMetadataSummary = {
 describe('GameOverview summary translation', () => {
   afterEach(() => cleanup());
 
+  it('explains a failed metadata load and keeps the editor available for retry', () => {
+    const onEdit = vi.fn();
+    render(<GameOverview game={game} metadata={{ ...metadata, sources: [{ ...metadata.sources[0],
+      status: 'failed', summary: null, errorMessage: 'fetch failed' }] }} onEdit={onEdit} />);
+    expect(screen.getByRole('status', { name: '作品资料加载提示' })).toHaveTextContent('VNDB 资料暂时加载失败');
+    fireEvent.click(screen.getByRole('button', { name: '编辑作品资料' }));
+    expect(onEdit).toHaveBeenCalledOnce();
+  });
+
+  it('keeps cached content visible during a refresh', () => {
+    render(<GameOverview game={game} metadata={metadata} loading onEdit={vi.fn()} />);
+    expect(screen.getByText(metadata.sources[0].summary!)).toBeInTheDocument();
+  });
+
   it('translates on demand and lets the user switch between Chinese, original, and bilingual text', async () => {
     const onTranslateSummary = vi.fn().mockResolvedValue('一个关于大海与难忘夏日的故事。');
     render(

@@ -17,6 +17,7 @@ import { GameOverview } from './components/library/GameOverview';
 import { GameShelf } from './components/library/GameShelf';
 import { TagChips } from './features/reina/TagChips';
 import { useGameTagFilter } from './hooks/useGameTagFilter';
+import { useGameMetadata } from './hooks/useGameMetadata';
 import { PlayerBar, type PlayerBarProps, type PlayerBarState } from './components/layout/PlayerBar';
 import { TitleBar } from './components/layout/TitleBar';
 import { ScanDialog } from './components/scanner/ScanDialog';
@@ -119,9 +120,9 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
   const welcomeDismissedRef = useRef(false);
   const [trackKindFilter, setTrackKindFilter] = useState<TrackKind | null>(null);
   const [gameViewMode, setGameViewMode] = useState<GameViewMode>('overview');
-  const [selectedGameMetadata, setSelectedGameMetadata] = useState<GameMetadataSummary | null>(null);
+  const { metadata: selectedGameMetadata, setMetadata: setSelectedGameMetadata,
+    loading: isLoadingGameMetadata, error: gameMetadataError } = useGameMetadata(selectedGameId);
   const gameTagFilter = useGameTagFilter(games, selectedGameMetadata);
-  const [isLoadingGameMetadata, setIsLoadingGameMetadata] = useState(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
   const [bulkDialog, setBulkDialog] = useState<'move' | 'playlist' | 'delete' | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -189,23 +190,6 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
 
   useEffect(() => {
     setTrackKindFilter(null);
-  }, [selectedGameId]);
-
-  useEffect(() => {
-    let active = true;
-    setSelectedGameMetadata(null);
-    if (!selectedGameId) {
-      setIsLoadingGameMetadata(false);
-      return () => { active = false; };
-    }
-    const api = getGalMusicApi();
-    if (!api?.getGameMetadata) return () => { active = false; };
-    setIsLoadingGameMetadata(true);
-    void api.getGameMetadata(selectedGameId)
-      .then((metadata) => { if (active) setSelectedGameMetadata(metadata); })
-      .catch(() => undefined)
-      .finally(() => { if (active) setIsLoadingGameMetadata(false); });
-    return () => { active = false; };
   }, [selectedGameId]);
 
   useEffect(() => {
@@ -607,7 +591,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
                   <button type="button" aria-label="打开手账空间" className={gameViewMode === 'journal' ? 'is-active' : ''} aria-current={gameViewMode === 'journal' ? 'page' : undefined} onClick={() => setGameViewMode('journal')}><BookOpen size={15} aria-hidden="true" />手账</button>
                 </nav>
 
-                {gameViewMode === 'overview' && <GameOverview key={selectedGame.id} game={selectedGame} metadata={selectedGameMetadata} loading={isLoadingGameMetadata} onEdit={() => { void openGameEditor(selectedGame); }} onTranslateSummary={(source) => translateGameSummary(selectedGame.id, source)} onSelectTag={tag => { gameTagFilter.toggle(tag); returnToShelf(); }} />}
+                {gameViewMode === 'overview' && <GameOverview key={selectedGame.id} game={selectedGame} metadata={selectedGameMetadata} loading={isLoadingGameMetadata} error={gameMetadataError} onEdit={() => { void openGameEditor(selectedGame); }} onTranslateSummary={(source) => translateGameSummary(selectedGame.id, source)} onSelectTag={tag => { gameTagFilter.toggle(tag); returnToShelf(); }} />}
 
                 {gameViewMode === 'tracks' && (
                   <>

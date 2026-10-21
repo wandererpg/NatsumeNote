@@ -30,7 +30,7 @@ import {
   trackingModeLabel,
 } from './reina-format';
 import './reina.css';
-import { notifyReinaTagsChanged } from './reina-events';
+import { notifyReinaTagsChanged, REINA_TAGS_CHANGED_EVENT } from './reina-events';
 
 export interface ReinaGamePanelProps {
   gameId: string;
@@ -238,6 +238,10 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
 
   useEffect(() => {
     void loadLinks();
+    // Batch imports can update the association while this details panel stays mounted.
+    const reload = () => { void loadLinks(); };
+    window.addEventListener(REINA_TAGS_CHANGED_EVENT, reload);
+    return () => { window.removeEventListener(REINA_TAGS_CHANGED_EVENT, reload); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
 

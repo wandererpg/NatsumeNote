@@ -374,6 +374,18 @@ describe('ReinaHistoryPreview', () => {
 });
 
 describe('ReinaGamePanel', () => {
+  it('recognizes a batch-imported link without making the user select it again', async () => {
+    const api = makeGameApi();
+    installBridge(api);
+    render(<ReinaGamePanel gameId="game-2" gameName="本地作品" />);
+    expect(await screen.findByText(/数据库已连接，此作品尚未关联/)).toBeInTheDocument();
+    api.reinaLinks.mockResolvedValue([linkedGame]);
+    act(() => { window.dispatchEvent(new Event('reina-tags-changed')); });
+    expect(await screen.findByRole('group', { name: '游玩统计（两种口径）' })).toBeInTheDocument();
+    expect(api.reinaQuery).toHaveBeenCalledWith('reina_get_stats', expect.objectContaining({ gameId: 77 }));
+    expect(api.reinaQuery).toHaveBeenCalledWith('reina_list_sessions', expect.objectContaining({ gameId: 77 }));
+  });
+
   it('browses differently named source games, previews lifetime totals and reads history only after confirmation', async () => {
     const candidate: ReinaGame = {
       id: 42, name: '来源中的日文标题', externalIds: [], tags: [], unsupportedTagProviders: [],

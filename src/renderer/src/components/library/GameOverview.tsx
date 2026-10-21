@@ -13,6 +13,7 @@ export interface GameOverviewProps {
   game: Game;
   metadata: GameMetadataSummary | null;
   loading?: boolean;
+  error?: string | null;
   onEdit: () => void;
   onTranslateSummary?: (source: MetadataSource) => Promise<string>;
   onSelectTag?: (name: string) => void;
@@ -33,9 +34,10 @@ function bestCreditsSource(metadata: GameMetadataSummary | null): GameMetadataSo
     ?? null;
 }
 
-export function GameOverview({ game, metadata, loading = false, onEdit, onTranslateSummary, onSelectTag }: GameOverviewProps) {
+export function GameOverview({ game, metadata, loading = false, error, onEdit, onTranslateSummary, onSelectTag }: GameOverviewProps) {
   const source = bestSource(metadata);
   const creditsSource = bestCreditsSource(metadata);
+  const failedSources = metadata?.sources.filter(item => item.status === 'failed') ?? [];
   const [indexedTags, setIndexedTags] = useState<ReinaTag[]>([]);
   useEffect(() => {
     let active = true; let generation = 0;
@@ -60,7 +62,7 @@ export function GameOverview({ game, metadata, loading = false, onEdit, onTransl
         {source?.titleCn && source.title && source.titleCn !== source.title && (
           <p className="game-overview__original-title">{source.title}</p>
         )}
-        {loading ? (
+        {loading && !source?.summary ? (
           <p className="game-overview__summary">正在读取作品资料…</p>
         ) : source?.summary ? (
           <SummaryReader
@@ -68,8 +70,15 @@ export function GameOverview({ game, metadata, loading = false, onEdit, onTransl
             translated={source.summaryZhCn ?? null}
             onTranslate={onTranslateSummary ? () => onTranslateSummary(source.source) : undefined}
           />
-        ) : (
+        ) : failedSources.length === 0 && !error ? (
           <p className="game-overview__summary">还没有可展示的作品简介。可以编辑作品或刷新网络资料，为这部作品补全档案。</p>
+        ) : null}
+        {error && <p className="game-overview__summary" role="alert">作品资料加载失败：{error}。可在“编辑作品资料”中刷新重试。</p>}
+        {!loading && failedSources.length > 0 && (
+          <p className="game-overview__summary" role="status" aria-label="作品资料加载提示">
+            {failedSources.map(item => item.source === 'vndb' ? 'VNDB' : 'Bangumi').join('、')} 资料暂时加载失败。
+            请在“编辑作品资料”中刷新重试，已导入的作品和游玩记录仍可使用。
+          </p>
         )}
         {tags.length > 0 && <TagChips tags={tags} onToggle={onSelectTag} />}
         <button className="button button--ghost" type="button" onClick={onEdit}>编辑作品资料</button>

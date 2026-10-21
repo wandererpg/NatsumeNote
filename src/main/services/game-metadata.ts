@@ -15,6 +15,7 @@ import { assertWithin, sanitizeDirectoryName } from '../../shared/paths';
 import { downloadCover, type CoverHttpClient } from './cover-download';
 import { translateSummaryToChinese } from './summary-translation';
 import { fetchMetadataCredits } from './metadata-credits';
+import { confirmedReinaMetadataIds } from '../reina/metadata-links';
 
 export interface MetadataHttpResponse {
   ok: boolean;
@@ -67,6 +68,7 @@ const SOURCE_ORDER: MetadataSource[] = ['vndb', 'bangumi'];
 const SOURCE_RETRY_MINUTES = 30;
 const REQUEST_TIMEOUT_MS = 12_000;
 const APPLICATION_USER_AGENT = 'NatsumeNote/0.1.0';
+const VNDB_METADATA_FIELDS = 'id,title,alttitle,aliases,description,developers.name,rating,released,languages,platforms,tags.name,tags.rating,tags.spoiler,image.url';
 
 /** Normalize only search/matching input; the display name remains unchanged. */
 export function normalizeGameName(input: string): string {
@@ -329,7 +331,7 @@ export async function searchVndb(name: string, signal: AbortSignal, http: Metada
       filters: ['search', '=', name],
       // `rank` was removed from the current Kana API field set. Requesting it
       // makes an otherwise valid search fail with HTTP 400.
-      fields: 'id,title,alttitle,aliases,description,developers.name,rating,released,languages,platforms,tags.name,tags.rating,tags.spoiler,image.url',
+      fields: VNDB_METADATA_FIELDS,
       results: 10,
       sort: 'searchrank',
     }),
@@ -424,7 +426,7 @@ async function lookupMetadata(source: MetadataSource, id: string, signal: AbortS
   const response = source === 'vndb'
     ? await http.fetch('https://api.vndb.org/kana/vn', { method: 'POST', signal,
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ filters: ['id', '=', id], fields: 'id,title,alttitle,aliases,description,developers.name,rating,image.url,released', results: 1 }) })
+      body: JSON.stringify({ filters: ['id', '=', id], fields: VNDB_METADATA_FIELDS, results: 1 }) })
     : await http.fetch(`https://api.bgm.tv/v0/subjects/${encodeURIComponent(id)}`, { signal,
       headers: { Accept: 'application/json', 'User-Agent': APPLICATION_USER_AGENT } });
   const body = await expectJson(response, source);
@@ -663,34 +665,47 @@ export function createGameMetadataService(options: GameMetadataServiceOptions): 
     const current = now();
     const rows = getGameSources(options.db, gameId);
     const rowsBySource = new Map(rows.map((row) => [row.source, row]));
-    const sourcesToQuery = SOURCE_ORDER.filter((source) => shouldQuery(rowsBySource.get(source), current, Boolean(request.force)));
+    const importedIds = confirmedReinaMetadataIds(options.db, gameId);
+    const sourcesToQuery = SOURCE_ORDER.filter((source) => {
+      const previous = rowsBySource.get(source);
+      // Recover title-search caches made before Reina IDs were passed through.
+      const newImportedId = importedIds[source] && previous?.status !== 'matched'
+        && previous?.externalId !== importedIds[source];
+      return newImportedId || shouldQuery(previous, current, Boolean(request.force));
+    });
     let completed = 0;
     request.onProgress?.({ phase: 'metadata', current: 0, total: sourcesToQuery.length, currentFile: game.name });
 
     const outcomes = await Promise.allSettled(sourcesToQuery.map(async (source) => {
       const timeout = childTimeout(request.signal, REQUEST_TIMEOUT_MS);
+      const previous = getGameSource(options.db, gameId, source);
+      // Existing confirmed metadata (including manual choices) takes precedence.
+      const importedId = previous?.status === 'matched' ? undefined : importedIds[source];
+      const lookupId = previous?.status === 'matched' ? previous.externalId : importedId;
+      const linkIsCurrent = () => !importedId || confirmedReinaMetadataIds(options.db, gameId)[source] === importedId;
       try {
-        const previous = getGameSource(options.db, gameId, source);
-        const candidates = previous?.externalId && previous.status === 'matched'
-          ? [await lookupMetadata(source, previous.externalId, timeout.signal, http)]
+        const candidates = lookupId
+          ? [await lookupMetadata(source, lookupId, timeout.signal, http)]
           : source === 'vndb'
           ? await searchVndb(queryName, timeout.signal, http)
           : await searchBangumi(queryName, timeout.signal, http);
         timeout.signal.throwIfAborted();
         if (!getGame(options.db, gameId)) throw new Error('作品已删除。');
-        const resolution: CandidateResolution = previous?.externalId && previous.status === 'matched'
+        if (!linkIsCurrent()) return;
+        const resolution: CandidateResolution = lookupId
           ? { status: 'matched', matched: candidates[0], candidates } : resolveCandidate(game.name, candidates);
         upsertGameSource(options.db, { ...sourceInput(gameId, source, queryName, resolution, nowIso(now)),
           matchMethod: previous?.matchMethod ?? (resolution.status === 'matched' ? 'auto' : null),
           confirmedAt: previous?.confirmedAt ?? null, revision: (previous?.revision ?? 0) + 1 });
       } catch (error) {
         if (request.signal.aborted) throw error;
+        if (!linkIsCurrent()) return;
         const previous = getGameSource(options.db, gameId, source);
         if (!getGame(options.db, gameId)) throw error;
         upsertGameSource(options.db, {
           gameId,
           source,
-          externalId: previous?.externalId ?? null,
+          externalId: lookupId ?? previous?.externalId ?? null,
           queryName,
           status: previous?.status === 'matched' ? 'matched' : 'failed',
           dataJson: previous?.dataJson ?? null,
