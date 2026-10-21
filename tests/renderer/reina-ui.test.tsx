@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ReinaGamePanel } from '../../src/renderer/src/features/reina/ReinaGamePanel';
 import { ReinaHistoryPreview } from '../../src/renderer/src/features/reina/ReinaHistoryPreview';
+import { ReinaBatchImportPanel } from '../../src/renderer/src/features/reina/ReinaBatchImportPanel';
+import type { ReinaBatchPreview } from '../../src/shared/reina';
 import { TagChips } from '../../src/renderer/src/features/reina/TagChips';
 import { useReinaSessions } from '../../src/renderer/src/features/reina/useReinaSessions';
 import type {
@@ -90,6 +92,80 @@ function makeGameApi(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+function batchPreview(): ReinaBatchPreview {
+  return { token: 'batch-token', libraryPath: 'D:/Music', warnings: [],
+    localGames: [{ id: 'local', name: '已有作品' }, { id: 'manual', name: '手动匹配作品' }],
+    rows: [
+      { externalGameId: 1, name: '来源同名作品', action: 'review', reason: '存在多个匹配', alreadyLinked: false, newName: '来源同名作品' },
+      { externalGameId: 2, name: '来源新作品', action: 'create', reason: '新建', alreadyLinked: false, newName: '来源新作品' },
+    ] };
+}
+describe('Reina batch import', () => {
+  it('waits for manual matching, submits only explicit decisions and refreshes the library', async () => {
+    const api = { reinaBatchPreview: vi.fn().mockResolvedValue(batchPreview()), reinaBatchApply: vi.fn().mockResolvedValue({ created: 1, linked: 1, skipped: 0 }), getGames: vi.fn().mockResolvedValue([]) };
+    installBridge(api);
+    render(<ReinaBatchImportPanel sourceId="reina-main" />);
+    fireEvent.click(screen.getByRole('button', { name: '预览并导入全部作品' }));
+    await screen.findByRole('combobox', { name: '匹配 来源同名作品（1）' });
+    expect((screen.getByRole('button', { name: '确认导入 1 部作品' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByRole('combobox', { name: '匹配 来源同名作品（1）' }), { target: { value: 'link:manual' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认导入 2 部作品' }));
+    await screen.findByText(/导入完成：新建 1 部，关联 1 部/);
+    expect(api.reinaBatchApply).toHaveBeenCalledWith('batch-token', [{ externalGameId: 1, action: 'link', localGameId: 'manual' }, { externalGameId: 2, action: 'create' }]);
+    expect(api.getGames).toHaveBeenCalledOnce();
+  });
+  it('shows loading/errors with a retry and prevents duplicate manual targets', async () => {
+    let reject!: (error: Error) => void;
+    const api = { reinaBatchPreview: vi.fn().mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail; })).mockResolvedValue(batchPreview()), reinaBatchApply: vi.fn() };
+    installBridge(api);
+    render(<ReinaBatchImportPanel sourceId="reina-main" />);
+    fireEvent.click(screen.getByRole('button', { name: '预览并导入全部作品' }));
+    expect((screen.getByRole('button', { name: '正在读取全部作品…' }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => { reject(new Error('无法读取来源')); });
+    expect(screen.getByRole('alert').textContent).toContain('无法读取来源');
+    fireEvent.click(screen.getByRole('button', { name: '预览并导入全部作品' }));
+    await screen.findByRole('combobox', { name: '匹配 来源同名作品（1）' });
+    fireEvent.change(screen.getByRole('combobox', { name: '匹配 来源同名作品（1）' }), { target: { value: 'link:local' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '匹配 来源新作品（2）' }), { target: { value: 'link:local' } });
+    expect(screen.getByRole('alert').textContent).toContain('多个来源作品');
+    expect((screen.getByRole('button', { name: '确认导入 2 部作品' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(api.reinaBatchApply).not.toHaveBeenCalled();
+  });
+  it('can cancel a preview without saving and paginates all source games', async () => {
+    const preview = batchPreview();
+    preview.rows = Array.from({ length: 28 }, (_, index) => ({ ...preview.rows[1], externalGameId: index + 1, name: `作品${index + 1}` }));
+    const api = { reinaBatchPreview: vi.fn().mockResolvedValue(preview), reinaBatchApply: vi.fn() };
+    installBridge(api);
+    render(<ReinaBatchImportPanel sourceId="reina-main" />);
+    fireEvent.click(screen.getByRole('button', { name: '预览并导入全部作品' }));
+    await screen.findByText(/共 28 部/);
+    expect(screen.getAllByRole('combobox')).toHaveLength(20);
+    fireEvent.click(screen.getByRole('button', { name: '下一页' }));
+    expect(screen.getAllByRole('combobox')).toHaveLength(8);
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(api.reinaBatchApply).not.toHaveBeenCalled();
+  });
+  it('requires explicit reconfirmation of stale links and can restore a skipped original link', async () => {
+    const preview = batchPreview();
+    preview.rows = [{ ...preview.rows[0], alreadyLinked: true, localGameId: 'local' }];
+    preview.localGames[0].boundExternalGameId = 1;
+    const api = { reinaBatchPreview: vi.fn().mockResolvedValue(preview), reinaBatchApply: vi.fn().mockRejectedValue(new Error('导入预览已失效，请重新预览。')) };
+    installBridge(api);
+    render(<ReinaBatchImportPanel sourceId="reina-main" />);
+    fireEvent.click(screen.getByRole('button', { name: '预览并导入全部作品' }));
+    const select = await screen.findByRole('combobox', { name: '匹配 来源同名作品（1）' });
+    expect((screen.getByRole('button', { name: '确认导入 0 部作品' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(select).queryByRole('option', { name: '新建作品及文件夹' })).toBeNull();
+    fireEvent.change(select, { target: { value: 'skip' } });
+    fireEvent.change(select, { target: { value: 'link:local' } });
+    fireEvent.click(screen.getByRole('button', { name: '确认导入 1 部作品' }));
+    await screen.findByRole('alert');
+    expect(screen.getByRole('alert').textContent).toContain('重新预览');
+    expect(api.reinaBatchApply).toHaveBeenCalledWith('batch-token', [{ externalGameId: 1, action: 'link', localGameId: 'local' }]);
+  });
+});
 
 describe('TagChips', () => {
   it('removes an invalid key again after the provider tag has reappeared', () => {

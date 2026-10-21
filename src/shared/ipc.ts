@@ -95,6 +95,8 @@ export const PLAYER_ERROR = 'player:error' as const;
 
 /** Request channels grouped for handler registration. */
 export const IPC_REQUESTS = {
+  reinaBatchPreview: REINA_CHANNELS.batchPreview,
+  reinaBatchApply: REINA_CHANNELS.batchApply,
   reinaSources: REINA_CHANNELS.sources,
   reinaConnect: REINA_CHANNELS.connect,
   reinaDisconnect: REINA_CHANNELS.disconnect,

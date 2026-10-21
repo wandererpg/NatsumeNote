@@ -145,6 +145,8 @@ export function createGalMusicApi(ipc: IpcRendererLike): GalMusicAPI {
   const invoke = createInvoker(ipc);
   return {
     reinaSources: () => invoke(REINA_CHANNELS.sources),
+    reinaBatchPreview: sourceId => invoke(REINA_CHANNELS.batchPreview, sourceId),
+    reinaBatchApply: (token, decisions) => invoke(REINA_CHANNELS.batchApply, token, decisions),
     reinaConnect: () => invoke(REINA_CHANNELS.connect),
     reinaDisconnect: sourceId => invoke(REINA_CHANNELS.disconnect, sourceId),
     reinaQuery: (tool, query) => invoke(REINA_CHANNELS.query, tool, query),

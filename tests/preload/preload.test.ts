@@ -11,6 +11,15 @@ import type { BulkTrackRequest } from '../../src/shared/types';
 import { REINA_CHANNELS } from '../../src/shared/reina';
 
 describe('preload bridge', () => {
+  it('exposes batch preview and confirmation without arbitrary folder paths', async () => {
+    const ipc: IpcRendererLike = { invoke: vi.fn().mockResolvedValue(null), on: vi.fn() };
+    const api = createGalMusicApi(ipc);
+    const rows = [{ externalGameId: 1, action: 'create' as const }];
+    await api.reinaBatchPreview!('source');
+    await api.reinaBatchApply!('token', rows);
+    expect(ipc.invoke).toHaveBeenNthCalledWith(1, REINA_CHANNELS.batchPreview, 'source');
+    expect(ipc.invoke).toHaveBeenNthCalledWith(2, REINA_CHANNELS.batchApply, 'token', rows);
+  });
   it('exposes only fixed Reina commands, with no path argument on authorization', async () => {
     const ipc: IpcRendererLike = { invoke: vi.fn().mockResolvedValue(null), on: vi.fn() };
     const api = createGalMusicApi(ipc);

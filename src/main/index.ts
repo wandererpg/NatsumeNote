@@ -1,5 +1,7 @@
 import { registerLibrarySyncHandlers } from './ipc/library-sync-handlers';
 import { registerReinaHandlers } from './ipc/reina-handlers';
+import { registerReinaBatchHandlers } from './ipc/reina-batch-handlers';
+import { ReinaBatchImport } from './reina/batch-import';
 import { ReinaService } from './reina/service';
 import { ReinaQueryProcess } from './reina/query-process';
 import { app, autoUpdater as electronAutoUpdater, BrowserWindow, dialog, ipcMain, net, protocol, shell } from 'electron';
@@ -742,6 +744,7 @@ export async function bootstrapMainProcess(options: BootstrapOptions = {}): Prom
   });
   registerLibrarySyncHandlers({ ipc: ipcMain as unknown as IpcMainLike, dialog: dialog as unknown as DialogLike, db, guard: installGuard, getLibraryPath: async () => getSetting(db, 'library_path') ?? defaultLibrary, application: 'NatsumeNote' });
   const reina = new ReinaService(db, new ReinaQueryProcess());
+  registerReinaBatchHandlers(ipcMain as unknown as IpcMainLike, new ReinaBatchImport(db, reina, () => getSetting(db, 'library_path') ?? defaultLibrary), installGuard);
   registerReinaHandlers({ ipc: ipcMain as unknown as IpcMainLike, dialog: dialog as unknown as DialogLike, service: reina, guard: installGuard });
   registerUpdateHandlers(ipcMain as unknown as IpcMainLike, updates, () => installGuard.run(() => {
     if (getSetting(db, 'update_resume_pending') !== 'true') return null;

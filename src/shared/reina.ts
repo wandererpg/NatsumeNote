@@ -14,11 +14,14 @@ export interface ReinaLink { localGameId: string; sourceId: string; externalGame
 export interface ReinaPlaySnapshot { version: 1; sourceApp: 'ReinaManager'; sourceId: string; externalGameId: number; externalGameName: string; fetchedAt: string; sessions: ReinaSession[]; stats: ReinaStats }
 export interface GameTagFilter { tags: string[] }
 export const REINA_CHANNELS = {
+  batchPreview: 'reina:batch-preview', batchApply: 'reina:batch-apply',
   sources: 'reina:sources', connect: 'reina:connect', disconnect: 'reina:disconnect',
   query: 'reina:query', links: 'reina:links', bind: 'reina:bind', unbind: 'reina:unbind',
   filterGames: 'library:filter-games-by-tags', tags: 'library:game-tags',
 } as const;
 export interface ReinaAPI {
+  reinaBatchPreview?: (sourceId: string) => Promise<ReinaBatchPreview>;
+  reinaBatchApply?: (token: string, decisions: ReinaBatchDecision[]) => Promise<ReinaBatchResult>;
   reinaSources?: () => Promise<ReinaSource[]>;
   reinaConnect?: () => Promise<ReinaSource | null>;
   reinaDisconnect?: (sourceId: string) => Promise<void>;
@@ -29,3 +32,23 @@ export interface ReinaAPI {
   filterGamesByTags?: (tags: string[]) => Promise<import('./types').Game[]>;
   getGameTags?: (localGameId?: string) => Promise<ReinaTag[]>;
 }
+
+export interface ReinaBatchDecision {
+  externalGameId: number;
+  action: 'link' | 'create' | 'skip' | 'review';
+  localGameId?: string;
+}
+export interface ReinaBatchRow extends ReinaBatchDecision {
+  name: string;
+  reason: string;
+  newName?: string;
+  alreadyLinked: boolean;
+}
+export interface ReinaBatchPreview {
+  token: string;
+  libraryPath: string;
+  rows: ReinaBatchRow[];
+  localGames: { id: string; name: string; boundExternalGameId?: number }[];
+  warnings: string[];
+}
+export interface ReinaBatchResult { created: number; linked: number; skipped: number }

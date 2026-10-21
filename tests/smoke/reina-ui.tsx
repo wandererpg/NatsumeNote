@@ -20,6 +20,14 @@ Object.defineProperty(window, 'galMusic', { value: {
   },
   reinaLinks: async () => mode === 'connected' ? [{ localGameId: 'local', sourceId: source.id, externalGameId: 42, externalName: name }] : [],
   reinaQuery: async (tool: string) => envelope(tool === 'reina_get_stats' ? stats : tool === 'reina_list_sessions' ? sessions : tool === 'reina_get_connection' ? { readable: true, liveSession: false, schemaProfile: 'synthetic-audited' } : tool === 'reina_list_games' ? [{ id: 42, name, externalIds: [], tags, unsupportedTagProviders: [] }] : []),
+  reinaBatchPreview: async () => {
+    if (mode === 'batch-loading') return new Promise(() => {});
+    if (mode === 'batch-error') throw new Error('无法读取批量导入预览，请重试。');
+    return { token: 'synthetic-batch', libraryPath: 'D:/Music/作品文件夹/长目录名称测试', warnings: [],
+      localGames: [{ id: 'local', name }],
+      rows: Array.from({ length: 28 }, (_, index) => ({ externalGameId: index + 1, name: `${name} 第${index + 1}部`, action: index === 0 ? 'review' : 'create', reason: index === 0 ? '存在多个匹配，请手动选择' : '未找到对应作品，将新建作品和文件夹', alreadyLinked: false, newName: `${name} (${index + 1})` })) };
+  },
+  reinaBatchApply: async () => ({ created: 27, linked: 1, skipped: 0 }),
   reinaConnect: async () => source,
   reinaDisconnect: async () => {},
   reinaBind: async () => {},

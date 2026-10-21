@@ -15,6 +15,7 @@ import { useReinaSources } from './useReinaSources';
 import { formatDateTime } from './reina-format';
 import { notifyReinaTagsChanged } from './reina-events';
 import './reina.css';
+import { ReinaBatchImportPanel } from './ReinaBatchImportPanel';
 
 type TestEntry =
   | {
@@ -64,7 +65,7 @@ export function ReinaConnectionPanel() {
       if (source) notifyReinaTagsChanged();
       if (!mountedRef.current) return;
       if (source) {
-        setStatusMessage(`已连接 ${source.label || 'ReinaManager 数据库'}。下一步：打开作品概览 → 游玩记录，浏览来源作品并确认关联，即可读取历史时长。`);
+        setStatusMessage(`已连接 ${source.label || 'ReinaManager 数据库'}。下一步：在下方批量导入作品，预览并确认匹配后即可读取历史时长。`);
         await reload();
       } else {
         setStatusMessage('已取消选择数据库，未创建连接。');
@@ -207,7 +208,7 @@ export function ReinaConnectionPanel() {
 
       {sources && sources.length > 0 && (
         <p className="reina-notice">
-          连接完成后，请打开对应作品的「概览 → 游玩记录」，点击「浏览全部来源作品」，核对历史时长后关联。连接数据库不会自动匹配作品，标题不同也可以手动选择。
+          连接完成后，可在下方「批量导入作品」预览全部游戏，检查自动匹配并手动调整，确认后统一导入。也可以在作品的「概览 → 游玩记录」中单独关联。
         </p>
       )}
 
@@ -316,6 +317,7 @@ export function ReinaConnectionPanel() {
                     断开连接
                   </button>
                 </div>
+                <ReinaBatchImportPanel sourceId={source.id} disabled={connecting || Boolean(busy)} />
                 {test && test.status === 'ok' && (
                   <div className="reina-source__result" role="status">
                     <p>
