@@ -1,4 +1,5 @@
 import { LibrarySyncPanel } from './LibrarySyncPanel';
+import { ReinaConnectionPanel } from '../../features/reina/ReinaConnectionPanel';
 import { useEffect, useState } from 'react';
 import { FolderOpen, ImagePlus, LoaderCircle, Palette, Save, Trash2, Volume2, X } from 'lucide-react';
 
@@ -181,6 +182,7 @@ export function SettingsPanel({ settings, onClose, onSelectFolder, onSelectBackg
             </div>
           </section>
           <LibrarySyncPanel disabled={isSaving || isCancelling || isPicking} onBusyChange={setIsSyncing} />
+          <ReinaConnectionPanel />
           <AppUpdatePanel />
           {error && <p className="settings-panel__error" role="alert">{error}</p>}
         </div>

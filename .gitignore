@@ -21,6 +21,7 @@ github-release-staging-v*/
 # Local tooling state, logs, and OS files
 .superpowers/brainstorm/
 .vite/
+artifacts/reina-ui/
 coverage/
 *.log
 *.tsbuildinfo

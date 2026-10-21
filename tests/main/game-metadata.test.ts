@@ -1,3 +1,4 @@
+import { LATEST_SCHEMA_VERSION } from '../../src/main/database/migrations';
 import Database from 'better-sqlite3';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -285,8 +286,8 @@ describe('metadata migration fixture', () => {
   it('keeps the metadata test database on the current schema', () => {
     const db = new Database(':memory:');
     migrate(db);
-    expect(db.pragma('user_version', { simple: true })).toBe(8);
-    expect(db.pragma('user_version', { simple: true })).toBe(8);
+    expect(db.pragma('user_version', { simple: true })).toBe(LATEST_SCHEMA_VERSION);
+    expect(db.pragma('user_version', { simple: true })).toBe(LATEST_SCHEMA_VERSION);
     db.close();
   });
 

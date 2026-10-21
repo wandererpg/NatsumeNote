@@ -1,3 +1,4 @@
+import { LATEST_SCHEMA_VERSION } from '../../src/main/database/migrations';
 import Database from 'better-sqlite3';
 import { existsSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
@@ -94,10 +95,10 @@ describe('library database', () => {
     expect(existsSync(path.join(userDataDirectory, 'galmusic.db'))).toBe(true);
     expect(db.pragma('journal_mode', { simple: true })).toBe('wal');
     expect(db.pragma('foreign_keys', { simple: true })).toBe(1);
-    expect(db.pragma('user_version', { simple: true })).toBe(8);
+    expect(db.pragma('user_version', { simple: true })).toBe(LATEST_SCHEMA_VERSION);
 
     migrate(db);
-    expect(db.pragma('user_version', { simple: true })).toBe(8);
+    expect(db.pragma('user_version', { simple: true })).toBe(LATEST_SCHEMA_VERSION);
     db.close();
   });
 });

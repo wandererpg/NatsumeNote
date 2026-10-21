@@ -6,6 +6,7 @@ import type {
   Track,
 } from '../../../../shared/types';
 import { toJournalMediaUrl } from '../../../../shared/journal-media-url';
+import { formatPlayDate, formatPlayMinutes, formatPlaySessionRange, formatSnapshotFetchedAt } from './journal-play-session';
 
 export interface JournalExportOptions {
   gameName: string;
@@ -61,6 +62,18 @@ function renderTrackBlock(block: Extract<JournalBlock, { type: 'track' }>, track
   return `<rect width="${block.width}" height="${block.height}" rx="18" fill="#f4ede8" stroke="#d7b39e" stroke-width="2"/><circle cx="42" cy="52" r="24" fill="#d77863"/><path d="M 35 39 L 54 52 L 35 65 Z" fill="#fffdf8"/>${textSvg('音乐片段', 82, 38, 13, '#9a6659', 'start', 700)}${textSvg(label, 82, 70, 20, '#342d2a', 'start', 600)}${textSvg(detail, 82, 100, 13, '#725f58')}${block.note ? textSvg(block.note, 20, block.height - 18, 13, '#725f58') : ''}`;
 }
 
+function renderPlaySessionBlock(block: Extract<JournalBlock, { type: 'play-session' }>): string {
+  const snapshot = block.snapshot;
+  const rows = snapshot.sessions.slice(0, 4);
+  const rowSvg = rows.map((session, index) => (
+    `<text x="24" y="${134 + index * 24}" fill="#725f58" font-size="12" font-family="Segoe UI, Microsoft YaHei, sans-serif">${escapeXml(`${formatPlayDate(session)} ${formatPlaySessionRange(session)} · ${session.recordedMinutes} 分钟`)}</text>`
+  )).join('');
+  const more = snapshot.sessions.length > rows.length
+    ? `<text x="24" y="${134 + rows.length * 24}" fill="#9a6659" font-size="11" font-family="Segoe UI, Microsoft YaHei, sans-serif">${escapeXml(`另有 ${snapshot.sessions.length - rows.length} 次记录`)}</text>`
+    : '';
+  return `<rect width="${block.width}" height="${block.height}" rx="18" fill="#fff8ef" stroke="#d7b39e" stroke-width="2"/><rect width="8" height="${block.height}" rx="4" fill="#c86b58"/><text x="24" y="34" fill="#9a6659" font-size="12" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-weight="700">游玩记录</text><text x="24" y="64" fill="#342d2a" font-size="20" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-weight="600">${escapeXml(snapshot.externalGameName)}</text><text x="24" y="92" fill="#c86b58" font-size="16" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-weight="600">${escapeXml(formatPlayMinutes(snapshot.stats.sessionTotalMinutes))}</text><text x="24" y="114" fill="#725f58" font-size="12" font-family="Segoe UI, Microsoft YaHei, sans-serif">${escapeXml(`${snapshot.stats.sessionCount} 次 · 截至 ${formatSnapshotFetchedAt(snapshot.fetchedAt)}`)}</text>${rowSvg}${more}<text x="24" y="${block.height - 16}" fill="#9a6659" font-size="10" font-family="Segoe UI, Microsoft YaHei, sans-serif">${escapeXml(`${snapshot.sourceApp} · ${snapshot.sourceId}`)}</text>`;
+}
+
 function renderBlock(block: JournalBlock, options: JournalExportOptions): string {
   const asset = block.type === 'image' || block.type === 'video' ? options.assets.find((item) => item.id === block.assetId) : undefined;
   const track = block.type === 'track' ? options.tracks.find((item) => item.id === block.trackId) : undefined;
@@ -78,6 +91,9 @@ function renderBlock(block: JournalBlock, options: JournalExportOptions): string
       break;
     case 'track':
       body = renderTrackBlock(block, track);
+      break;
+    case 'play-session':
+      body = renderPlaySessionBlock(block);
       break;
     case 'details':
       return '';

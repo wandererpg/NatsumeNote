@@ -1,4 +1,5 @@
 import type { LibrarySyncAPI } from './library-sync';
+import { REINA_CHANNELS, type ReinaAPI } from './reina';
 import type {
   AppUpdateState,
   PlaybackSnapshot,
@@ -94,6 +95,15 @@ export const PLAYER_ERROR = 'player:error' as const;
 
 /** Request channels grouped for handler registration. */
 export const IPC_REQUESTS = {
+  reinaSources: REINA_CHANNELS.sources,
+  reinaConnect: REINA_CHANNELS.connect,
+  reinaDisconnect: REINA_CHANNELS.disconnect,
+  reinaQuery: REINA_CHANNELS.query,
+  reinaLinks: REINA_CHANNELS.links,
+  reinaBind: REINA_CHANNELS.bind,
+  reinaUnbind: REINA_CHANNELS.unbind,
+  libraryFilterGamesByTags: REINA_CHANNELS.filterGames,
+  libraryGameTags: REINA_CHANNELS.tags,
   updateGetState: UPDATE_GET_STATE,
   updateCheck: UPDATE_CHECK,
   updateDownload: UPDATE_DOWNLOAD,
@@ -213,7 +223,7 @@ export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
 export type IpcRequestChannel = (typeof IPC_REQUESTS)[keyof typeof IPC_REQUESTS];
 export type IpcEventChannel = (typeof IPC_EVENTS)[keyof typeof IPC_EVENTS];
 
-export interface GalMusicAPI extends LibrarySyncAPI {
+export interface GalMusicAPI extends LibrarySyncAPI, ReinaAPI {
   getUpdateState?: () => Promise<AppUpdateState>;
   checkForUpdates?: () => Promise<AppUpdateState>;
   downloadUpdate?: () => Promise<AppUpdateState>;

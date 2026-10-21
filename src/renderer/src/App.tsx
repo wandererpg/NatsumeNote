@@ -15,6 +15,8 @@ import { BulkTargetPicker } from './components/library/BulkTargetPicker';
 import { BulkTrackToolbar } from './components/library/BulkTrackToolbar';
 import { GameOverview } from './components/library/GameOverview';
 import { GameShelf } from './components/library/GameShelf';
+import { TagChips } from './features/reina/TagChips';
+import { useGameTagFilter } from './hooks/useGameTagFilter';
 import { PlayerBar, type PlayerBarProps, type PlayerBarState } from './components/layout/PlayerBar';
 import { TitleBar } from './components/layout/TitleBar';
 import { ScanDialog } from './components/scanner/ScanDialog';
@@ -118,6 +120,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
   const [trackKindFilter, setTrackKindFilter] = useState<TrackKind | null>(null);
   const [gameViewMode, setGameViewMode] = useState<GameViewMode>('overview');
   const [selectedGameMetadata, setSelectedGameMetadata] = useState<GameMetadataSummary | null>(null);
+  const gameTagFilter = useGameTagFilter(games, selectedGameMetadata);
   const [isLoadingGameMetadata, setIsLoadingGameMetadata] = useState(false);
   const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
   const [bulkDialog, setBulkDialog] = useState<'move' | 'playlist' | 'delete' | null>(null);
@@ -571,13 +574,21 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
                     scrollContainerRef={mainContentRef} scrollResetKey={viewKey} onOpenFolder={handleOpenFolder} />}
               </section>
             ) : !selectedGame ? (
-              <GameShelf
-                games={games}
+              <>
+              {gameTagFilter.supported && (gameTagFilter.tags.length > 0 || gameTagFilter.selected.length > 0) && (
+                <section className="library-tag-filter" aria-label="按作品标签筛选" aria-busy={gameTagFilter.loading}>
+                  <TagChips tags={gameTagFilter.tags} selected={gameTagFilter.selected} onToggle={gameTagFilter.toggle} onClear={gameTagFilter.clear} />
+                </section>
+              )}
+              {gameTagFilter.error && <p role="alert">{gameTagFilter.error} <button type="button" className="button button--ghost" onClick={gameTagFilter.retry}>重试</button></p>}
+              {gameTagFilter.pendingFilter ? (gameTagFilter.loading ? <p className="loading-state" role="status"><span className="loading-state__spinner" />正在筛选作品…</p> : null) : <GameShelf
+                games={gameTagFilter.filteredGames}
                 searchText={searchText}
                 onSelectGame={selectGame}
                 onEditGame={(game) => { void openGameEditor(game); }}
                 onImport={handleImport}
-              />
+              />}
+              </>
             ) : (
               <div className="game-room library-view" key={`${viewKey}:${gameViewMode}`}>
                 <header className="game-room__hero">
@@ -596,7 +607,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
                   <button type="button" aria-label="打开手账空间" className={gameViewMode === 'journal' ? 'is-active' : ''} aria-current={gameViewMode === 'journal' ? 'page' : undefined} onClick={() => setGameViewMode('journal')}><BookOpen size={15} aria-hidden="true" />手账</button>
                 </nav>
 
-                {gameViewMode === 'overview' && <GameOverview game={selectedGame} metadata={selectedGameMetadata} loading={isLoadingGameMetadata} onEdit={() => { void openGameEditor(selectedGame); }} onTranslateSummary={(source) => translateGameSummary(selectedGame.id, source)} />}
+                {gameViewMode === 'overview' && <GameOverview key={selectedGame.id} game={selectedGame} metadata={selectedGameMetadata} loading={isLoadingGameMetadata} onEdit={() => { void openGameEditor(selectedGame); }} onTranslateSummary={(source) => translateGameSummary(selectedGame.id, source)} onSelectTag={tag => { gameTagFilter.toggle(tag); returnToShelf(); }} />}
 
                 {gameViewMode === 'tracks' && (
                   <>

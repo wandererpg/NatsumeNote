@@ -1,3 +1,4 @@
+import { LATEST_SCHEMA_VERSION } from '../../src/main/database/migrations';
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 
@@ -19,7 +20,7 @@ describe('game metadata source queries', () => {
     db.pragma('user_version = 4');
     migrate(db);
 
-    expect(db.pragma('user_version', { simple: true })).toBe(8);
+    expect(db.pragma('user_version', { simple: true })).toBe(LATEST_SCHEMA_VERSION);
     expect(getGame(db, 'g1')?.coverSource).toBe('manual');
     expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'game_sources'").get()).toEqual({ name: 'game_sources' });
     db.close();

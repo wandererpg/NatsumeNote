@@ -1,4 +1,7 @@
 import { registerLibrarySyncHandlers } from './ipc/library-sync-handlers';
+import { registerReinaHandlers } from './ipc/reina-handlers';
+import { ReinaService } from './reina/service';
+import { ReinaQueryProcess } from './reina/query-process';
 import { app, autoUpdater as electronAutoUpdater, BrowserWindow, dialog, ipcMain, net, protocol, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -738,6 +741,8 @@ export async function bootstrapMainProcess(options: BootstrapOptions = {}): Prom
     publish: (state) => { if (mainWindow && !mainWindow.isDestroyed?.()) mainWindow.webContents?.send(UPDATE_STATE, state); },
   });
   registerLibrarySyncHandlers({ ipc: ipcMain as unknown as IpcMainLike, dialog: dialog as unknown as DialogLike, db, guard: installGuard, getLibraryPath: async () => getSetting(db, 'library_path') ?? defaultLibrary, application: 'NatsumeNote' });
+  const reina = new ReinaService(db, new ReinaQueryProcess());
+  registerReinaHandlers({ ipc: ipcMain as unknown as IpcMainLike, dialog: dialog as unknown as DialogLike, service: reina, guard: installGuard });
   registerUpdateHandlers(ipcMain as unknown as IpcMainLike, updates, () => installGuard.run(() => {
     if (getSetting(db, 'update_resume_pending') !== 'true') return null;
     const value = getSetting(db, 'update_playback_snapshot');
@@ -769,6 +774,7 @@ export async function bootstrapMainProcess(options: BootstrapOptions = {}): Prom
   app.on('before-quit', (event) => {
     if (rejectQueuedUpdateQuit) { rejectQueuedUpdateQuit = false; event.preventDefault(); return; }
     if (!updates.canQuit()) { event.preventDefault(); return; }
+    void reina.close().catch(() => undefined);
     if (db.open) db.close();
   });
 

@@ -1,0 +1,60 @@
+import { app } from 'electron';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import Database from 'better-sqlite3';
+import { migrate } from '../../src/main/database/migrations';
+import { ReinaQueryProcess } from '../../src/main/reina/query-process';
+import { ReinaService } from '../../src/main/reina/service';
+import type { ReinaSession, ReinaStats } from '../../src/shared/reina';
+const root = process.cwd();
+const folder = process.argv.find(value => value.startsWith('--reina-smoke-dir='))!.split('=')[1];
+app.setPath('userData', path.join(folder, 'electron-data'));
+void app.whenReady().then(async () => {
+  const sourcePath = path.join(folder, 'reina_manager.db');
+  const source = new Database(sourcePath);
+  source.exec(fs.readFileSync(path.join(root, 'tests/fixtures/reina-manager-audited.sql'), 'utf8'));
+  source.prepare('INSERT INTO games(id,custom_data) VALUES (?,?)').run(42, JSON.stringify({name:'Synthetic game',tags:['剧情']}));
+  source.prepare('INSERT INTO game_sources(game_id,source,external_id,data) VALUES (?,?,?,?)').run(42, 'bgm','42',JSON.stringify({name:'Source game',tags:['校园']}));
+  source.prepare('INSERT INTO game_sessions VALUES (?,?,?,?,?,?)').run(2,42,1790848800,1790852400,12,'2026-10-01');
+  source.prepare('INSERT INTO game_sessions VALUES (?,?,?,?,?,?)').run(1,42,1790845200,1790848800,7,'2026-10-01');
+  source.prepare('INSERT INTO game_statistics VALUES (?,?,?,?,?)').run(42,99,3,1790852400,'{}');
+  source.close();
+  const hash = () => createHash('sha256').update(fs.readFileSync(sourcePath)).digest('hex');
+  const before = hash();
+  const db = new Database(path.join(folder, 'galmusic.db')); migrate(db);
+  db.prepare('INSERT INTO games(id,name) VALUES (?,?)').run('local', 'Synthetic game');
+  const worker = new ReinaQueryProcess(3000, path.join(root, 'out/main/reina-query.js'));
+  const service = new ReinaService(db, worker);
+  try {
+    const connection = await service.connectSelectedFile(sourcePath);
+    assert.equal(service.links('local').length,0);
+    await service.query('reina_list_games',{sourceId:connection.id});
+    await service.bind({localGameId:'local',sourceId:connection.id,externalGameId:42,externalName:'untrusted'});
+    const first = await service.query<ReinaSession[]>('reina_list_sessions',{sourceId:connection.id,gameId:42,limit:1});
+    assert.equal(first.data[0].recordedMinutes,12);
+    assert.notEqual(first.data[0].recordedMinutes,60);
+    const total = await service.query<ReinaStats>('reina_get_stats',{sourceId:connection.id,gameId:42,snapshotId:first.snapshotId});
+    assert.equal(total.data.sessionTotalMinutes,19); assert.equal(total.data.sourceTotalMinutes,99);
+    const next = await service.query<ReinaSession[]>('reina_list_sessions',{sourceId:connection.id,gameId:42,limit:1,cursor:first.nextCursor!});
+    assert.equal(next.data[0].id,1);
+    assert.equal(service.filterGames(['custom:剧情','bangumi:校园']).length,1);
+    assert.equal(hash(),before,'read-only MCP must preserve source database bytes');
+    service.disconnect(connection.id);
+    await assert.rejects(()=>service.query('reina_get_connection',{sourceId:connection.id}));
+  } finally { await service.close(); db.close(); }
+  const timeoutEntry = path.join(folder,'timeout-worker.cjs');
+  fs.writeFileSync(timeoutEntry, `process.parentPort.on('message',({data})=>{if(data.query.sourceId==='hang'){while(true){}}else{process.parentPort.postMessage({id:data.id,result:{contractVersion:1,sourceApp:'ReinaManager',sourceId:data.query.sourceId,snapshotId:'recovered',fetchedAt:new Date().toISOString(),warnings:[],data:{readable:true},nextCursor:null}})}});`);
+  const timed = new ReinaQueryProcess(1000,timeoutEntry);
+  let heartbeat = 0;
+  const pulse = setInterval(()=>{heartbeat++;},20);
+  try {
+    await assert.rejects(()=>timed.call(sourcePath,'synthetic','reina_get_connection',{sourceId:'hang'}),/超时/);
+    assert.ok(heartbeat>5,'native-query isolation must leave the Electron main loop responsive');
+    const recovered = await timed.call(sourcePath,'synthetic','reina_get_connection',{sourceId:'recover'});
+    assert.equal(recovered.snapshotId,'recovered');
+  } finally { clearInterval(pulse); timed.close(); }
+  console.log('REINA_SMOKE_OK: official MCP + Electron utilityProcess + read-only source + pagination + tags + timeout recovery');
+  app.exit(0);
+}).catch(error=>{console.error(error); app.exit(1);});

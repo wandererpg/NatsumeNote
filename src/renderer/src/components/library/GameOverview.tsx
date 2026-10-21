@@ -1,4 +1,8 @@
 import { CalendarDays, ExternalLink, Gamepad2, Languages, LibraryBig, Sparkles, Star } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import type { ReinaTag } from '../../../../shared/reina';
+import { ReinaGamePanel } from '../../features/reina/ReinaGamePanel';
+import { TagChips } from '../../features/reina/TagChips';
 
 import { toCoverUrl } from '../../../../shared/cover-url';
 import type { Game, GameMetadataSourceSummary, GameMetadataSummary, MetadataSource } from '../../../../shared/types';
@@ -11,6 +15,7 @@ export interface GameOverviewProps {
   loading?: boolean;
   onEdit: () => void;
   onTranslateSummary?: (source: MetadataSource) => Promise<string>;
+  onSelectTag?: (name: string) => void;
 }
 
 function bestSource(metadata: GameMetadataSummary | null): GameMetadataSourceSummary | null {
@@ -28,12 +33,24 @@ function bestCreditsSource(metadata: GameMetadataSummary | null): GameMetadataSo
     ?? null;
 }
 
-export function GameOverview({ game, metadata, loading = false, onEdit, onTranslateSummary }: GameOverviewProps) {
+export function GameOverview({ game, metadata, loading = false, onEdit, onTranslateSummary, onSelectTag }: GameOverviewProps) {
   const source = bestSource(metadata);
   const creditsSource = bestCreditsSource(metadata);
+  const [indexedTags, setIndexedTags] = useState<ReinaTag[]>([]);
+  useEffect(() => {
+    let active = true; let generation = 0;
+    const reload = () => {
+      const request = ++generation;
+      void window.galMusic?.getGameTags?.(game.id).then(tags => { if (active && request === generation) setIndexedTags(tags); }).catch(() => undefined);
+    };
+    setIndexedTags([]); reload();
+    window.addEventListener('reina-tags-changed', reload);
+    return () => { active = false; window.removeEventListener('reina-tags-changed', reload); };
+  }, [game.id, metadata]);
+  const tags: ReinaTag[] = [...(metadata?.sources.filter(item => item.status === 'matched').flatMap(item => (item.tags ?? []).map(name => ({ name, provider: item.source }))) ?? []), ...indexedTags];
 
   return (
-    <section className="game-overview" aria-labelledby="game-overview-heading">
+    <><section className="game-overview" aria-labelledby="game-overview-heading">
       <div className="game-overview__cover" aria-hidden="true">
         {game.coverPath ? <img src={toCoverUrl(game.coverPath)} alt="" /> : <span>{game.name.slice(0, 2).toUpperCase()}</span>}
       </div>
@@ -54,11 +71,7 @@ export function GameOverview({ game, metadata, loading = false, onEdit, onTransl
         ) : (
           <p className="game-overview__summary">还没有可展示的作品简介。可以编辑作品或刷新网络资料，为这部作品补全档案。</p>
         )}
-        {source?.tags && source.tags.length > 0 && (
-          <div className="game-overview__tags" aria-label="作品标签">
-            {source.tags.slice(0, 10).map((tag) => <span key={tag}>{tag}</span>)}
-          </div>
-        )}
+        {tags.length > 0 && <TagChips tags={tags} onToggle={onSelectTag} />}
         <button className="button button--ghost" type="button" onClick={onEdit}>编辑作品资料</button>
       </div>
 
@@ -71,6 +84,6 @@ export function GameOverview({ game, metadata, loading = false, onEdit, onTransl
         {source?.sourceUrl && <a href={source.sourceUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden="true" />在 {source.source === 'vndb' ? 'VNDB' : 'Bangumi'} 查看</a>}
       </aside>
       {creditsSource && <GameArchiveDetails source={creditsSource} />}
-    </section>
+    </section><ReinaGamePanel gameId={game.id} gameName={game.name} /></>
   );
 }

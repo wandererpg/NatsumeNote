@@ -1,5 +1,6 @@
 import { SYNC_EXPORT, SYNC_PREVIEW, SYNC_APPLY, type SyncExportResult, type SyncPreview, type SyncApplyResult } from '../shared/library-sync';
 import { contextBridge, ipcRenderer } from 'electron';
+import { REINA_CHANNELS } from '../shared/reina';
 
 import {
   UPDATE_GET_STATE, UPDATE_CHECK, UPDATE_DOWNLOAD, UPDATE_INSTALL, UPDATE_STATE, UPDATE_GET_PLAYBACK, UPDATE_OPEN_DOWNLOADS,
@@ -143,6 +144,15 @@ function createInvoker(ipc: IpcRendererLike) {
 export function createGalMusicApi(ipc: IpcRendererLike): GalMusicAPI {
   const invoke = createInvoker(ipc);
   return {
+    reinaSources: () => invoke(REINA_CHANNELS.sources),
+    reinaConnect: () => invoke(REINA_CHANNELS.connect),
+    reinaDisconnect: sourceId => invoke(REINA_CHANNELS.disconnect, sourceId),
+    reinaQuery: (tool, query) => invoke(REINA_CHANNELS.query, tool, query),
+    reinaLinks: gameId => invoke(REINA_CHANNELS.links, gameId),
+    reinaBind: link => invoke(REINA_CHANNELS.bind, link),
+    reinaUnbind: (gameId, sourceId) => invoke(REINA_CHANNELS.unbind, gameId, sourceId),
+    filterGamesByTags: tags => invoke(REINA_CHANNELS.filterGames, tags),
+    getGameTags: gameId => invoke(REINA_CHANNELS.tags, gameId),
     exportSyncPackage: () => invoke<SyncExportResult | null>(SYNC_EXPORT),
     previewSyncPackage: () => invoke<SyncPreview | null>(SYNC_PREVIEW),
     applySyncPackage: (token, preference) => invoke<SyncApplyResult>(SYNC_APPLY, token, preference),

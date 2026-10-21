@@ -1,4 +1,5 @@
 import type { ErrorCode, SerializedAppError } from './errors';
+import type { ReinaPlaySnapshot } from './reina';
 
 /** Playback behavior used by the player queue. */
 export type PlayMode = 'sequential' | 'random' | 'single-loop' | 'list-loop';
@@ -258,12 +259,24 @@ export interface JournalDetailsBlock extends JournalBlockFrame {
   source: MetadataSource | 'auto';
 }
 
+/**
+ * A frozen, local copy of a ReinaManager play session selection.
+ *
+ * The card never follows the external source after insertion: the snapshot is
+ * historical, and only recorded play minutes (never music durations) are kept.
+ */
+export interface JournalPlaySessionBlock extends JournalBlockFrame {
+  type: 'play-session';
+  snapshot: ReinaPlaySnapshot;
+}
+
 export type JournalBlock =
   | JournalTextBlock
   | JournalQuoteBlock
   | JournalMediaBlock
   | JournalTrackBlock
-  | JournalDetailsBlock;
+  | JournalDetailsBlock
+  | JournalPlaySessionBlock;
 
 /** A managed image or video copied below the owning game's scrapbook folder. */
 export interface JournalAsset {

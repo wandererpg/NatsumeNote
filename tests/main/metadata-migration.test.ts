@@ -1,3 +1,4 @@
+import { LATEST_SCHEMA_VERSION } from '../../src/main/database/migrations';
 import Database from 'better-sqlite3';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -31,7 +32,7 @@ describe('metadata schema upgrade', () => {
         externalId: 'v17', status: 'matched', dataJson: '{"cached":"original"}',
         matchMethod: 'auto', confirmedAt: null, revision: 0,
       });
-      expect(db.pragma('user_version', { simple: true })).toBe(8);
+      expect(db.pragma('user_version', { simple: true })).toBe(LATEST_SCHEMA_VERSION);
       migrate(db);
       expect(db.prepare('SELECT COUNT(*) AS count FROM game_sources').get()).toEqual({ count: 1 });
     } finally { db.close(); }
@@ -51,7 +52,7 @@ describe('metadata schema upgrade', () => {
       db.prepare('DELETE FROM schema_migrations WHERE version > 6').run();
       migrate(db);
       expect(getGameSource(db, 'manual', 'vndb')).toEqual(before);
-      expect(db.pragma('user_version', { simple: true })).toBe(8);
+      expect(db.pragma('user_version', { simple: true })).toBe(LATEST_SCHEMA_VERSION);
     } finally { db.close(); }
   });
 

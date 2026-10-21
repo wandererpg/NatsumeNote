@@ -38,6 +38,7 @@ import {
   addJournalBlock,
   createBlankJournalPage,
   createJournalMediaBlock,
+  createJournalPlaySessionBlock,
   createJournalQuoteBlock,
   createJournalTextBlock,
   createJournalTrackBlock,
@@ -52,6 +53,9 @@ import {
   updateJournalBlock,
 } from './journal-model';
 import { downloadJournalPagePng, downloadJournalPageSvg } from './journal-export';
+import { describePlaySnapshot, formatPlayDate, formatPlayMinutes, formatPlaySessionRange, formatSnapshotFetchedAt } from './journal-play-session';
+import { PlaySessionPicker } from './PlaySessionPicker';
+import type { ReinaPlaySnapshot } from '../../../../shared/reina';
 
 export interface JournalWorkspaceProps {
   game: Game;
@@ -102,6 +106,46 @@ function defaultPageInput(gameId: string, pageId: string, title: string): Journa
     tags: ['初见'],
     soundtrackTrackId: null,
   };
+}
+
+function memoryBlockTitle(block: JournalBlock): string {
+  if (block.type === 'text') return '便签';
+  if (block.type === 'quote') return '引用';
+  if (block.type === 'track') return '音乐片段';
+  if (block.type === 'image') return '图片素材';
+  if (block.type === 'video') return '视频素材';
+  if (block.type === 'play-session') return '游玩记录';
+  return '素材';
+}
+
+function memoryBlockValue(block: JournalBlock, tracks: Track[], assets: JournalAsset[]): string {
+  if (block.type === 'text') return block.text || '空白便签';
+  if (block.type === 'quote') return block.quote;
+  if (block.type === 'track') return tracks.find((track) => track.id === block.trackId)?.displayName ?? '未找到曲目';
+  if (block.type === 'image' || block.type === 'video') return assets.find((asset) => asset.id === block.assetId)?.fileName ?? '素材';
+  if (block.type === 'play-session') return describePlaySnapshot(block.snapshot);
+  return '素材';
+}
+
+function blockSelectionLabel(block: JournalBlock): string {
+  if (block.type === 'text') return '文字';
+  if (block.type === 'details') return '作品详情';
+  if (block.type === 'track') return '音乐';
+  if (block.type === 'quote') return '引用';
+  if (block.type === 'image') return '图片';
+  if (block.type === 'video') return '视频';
+  if (block.type === 'play-session') return '游玩记录';
+  return '对象';
+}
+
+function blockInspectorTitle(block: JournalBlock): string {
+  if (block.type === 'track') return '音乐片段';
+  if (block.type === 'text') return '便签';
+  if (block.type === 'quote') return '引用卡片';
+  if (block.type === 'image') return '图片素材';
+  if (block.type === 'video') return '视频素材';
+  if (block.type === 'play-session') return '游玩记录卡片';
+  return '旧详情卡';
 }
 
 function BlockBody({
@@ -207,6 +251,27 @@ function BlockBody({
           placeholder="这首曲子让我想起…"
           aria-label="音乐笔记"
         />
+      </div>
+    );
+  }
+
+  if (block.type === 'play-session') {
+    const snapshot = block.snapshot;
+    const shownSessions = snapshot.sessions.slice(0, 3);
+    return (
+      <div className="journal-block__play-content">
+        <div className="journal-block__play-head"><span>游玩记录</span><small>{snapshot.stats.sessionCount} 次 · 离线快照</small></div>
+        <strong className="journal-block__play-name">{snapshot.externalGameName}</strong>
+        <div className="journal-block__play-total">{formatPlayMinutes(snapshot.stats.sessionTotalMinutes)}</div>
+        {shownSessions.length > 0 && (
+          <ul className="journal-block__play-list">
+            {shownSessions.map((session) => (
+              <li key={session.id}><span>{formatPlayDate(session)} · {formatPlaySessionRange(session)}</span><span>{session.recordedMinutes} 分钟</span></li>
+            ))}
+          </ul>
+        )}
+        {snapshot.sessions.length > shownSessions.length && <small className="journal-block__play-more">另有 {snapshot.sessions.length - shownSessions.length} 次记录</small>}
+        <small className="journal-block__play-meta">截至 {formatSnapshotFetchedAt(snapshot.fetchedAt)} · {snapshot.sourceApp} · {snapshot.sourceId}</small>
       </div>
     );
   }
@@ -422,6 +487,11 @@ export function JournalWorkspace({ game, tracks, currentTrack, currentTime = 0, 
     addBlock(createJournalTrackBlock(id(), track.id, currentTrack?.id === track.id ? currentTime : null, 80, 420));
   };
 
+  const insertPlaySessionCard = (snapshot: ReinaPlaySnapshot) => {
+    addBlock(createJournalPlaySessionBlock(id(), snapshot, 96, 300));
+    setNotice(`已插入游玩记录卡片 · ${snapshot.externalGameName} · ${formatPlayMinutes(snapshot.stats.sessionTotalMinutes)}`);
+  };
+
   const selectedBlock = page.blocks.find((block) => block.id === selectedBlockId) ?? null;
   const selectedAsset = selectedBlock?.type === 'image' || selectedBlock?.type === 'video'
     ? assets.find((asset) => asset.id === selectedBlock.assetId)
@@ -525,8 +595,8 @@ export function JournalWorkspace({ game, tracks, currentTrack, currentTime = 0, 
               <div className="journal-memory-page__blocks">
                 {pages[memoryPageIndex].blocks.filter((block) => block.type !== 'details').slice().sort((left, right) => left.zIndex - right.zIndex).map((memoryBlock) => (
                   <div key={memoryBlock.id} className="journal-memory-page__block">
-                    <strong>{memoryBlock.type === 'text' ? '便签' : memoryBlock.type === 'quote' ? '引用' : memoryBlock.type === 'track' ? '音乐片段' : memoryBlock.type === 'image' ? '图片素材' : '视频素材'}</strong>
-                    <span>{memoryBlock.type === 'text' ? (memoryBlock.text || '空白便签') : memoryBlock.type === 'quote' ? memoryBlock.quote : memoryBlock.type === 'track' ? (tracks.find((track) => track.id === memoryBlock.trackId)?.displayName ?? '未找到曲目') : (assets.find((asset) => asset.id === memoryBlock.assetId)?.fileName ?? '素材')}</span>
+                    <strong>{memoryBlockTitle(memoryBlock)}</strong>
+                    <span>{memoryBlockValue(memoryBlock, tracks, assets)}</span>
                   </div>
                 ))}
               </div>
@@ -619,7 +689,7 @@ export function JournalWorkspace({ game, tracks, currentTrack, currentTime = 0, 
                       />
                       {isSelected && (
                         <>
-                          <div className="journal-block__selection-label">{block.type === 'text' ? '文字' : block.type === 'details' ? '作品详情' : block.type === 'track' ? '音乐' : block.type === 'quote' ? '引用' : block.type === 'image' ? '图片' : '视频'}</div>
+                          <div className="journal-block__selection-label">{blockSelectionLabel(block)}</div>
                           {!block.locked && <button className="journal-block__resize-handle" type="button" aria-label="调整大小" onPointerDown={(event) => beginInteraction(event, block, 'resize')} />}
                         </>
                       )}
@@ -632,10 +702,11 @@ export function JournalWorkspace({ game, tracks, currentTrack, currentTime = 0, 
         </div>
 
         <aside className="journal-inspector">
+          <PlaySessionPicker gameId={game.id} onInsert={insertPlaySessionCard} />
           <div className="journal-panel-heading"><span>页面与对象</span><small>{selectedBlock ? '对象设置' : '页面设置'}</small></div>
           {selectedBlock ? (
             <div className="journal-inspector__object">
-              <div className="journal-inspector__object-title"><span>{selectedBlock.type === 'track' ? '音乐片段' : selectedBlock.type === 'text' ? '便签' : selectedBlock.type === 'quote' ? '引用卡片' : selectedBlock.type === 'image' ? '图片素材' : selectedBlock.type === 'video' ? '视频素材' : '旧详情卡'}</span><span className="journal-inspector__id">{selectedBlock.id.slice(-6)}</span></div>
+              <div className="journal-inspector__object-title"><span>{blockInspectorTitle(selectedBlock)}</span><span className="journal-inspector__id">{selectedBlock.id.slice(-6)}</span></div>
               <div className="journal-inspector__metrics"><label>X <input type="number" value={Math.round(selectedBlock.x)} onChange={(event) => mutateBlock(selectedBlock.id, { x: Number(event.target.value) })} /></label><label>Y <input type="number" value={Math.round(selectedBlock.y)} onChange={(event) => mutateBlock(selectedBlock.id, { y: Number(event.target.value) })} /></label><label>宽 <input type="number" value={Math.round(selectedBlock.width)} onChange={(event) => commitPage(resizeJournalBlock(page, selectedBlock.id, Number(event.target.value), selectedBlock.height))} /></label><label>高 <input type="number" value={Math.round(selectedBlock.height)} onChange={(event) => commitPage(resizeJournalBlock(page, selectedBlock.id, selectedBlock.width, Number(event.target.value)))} /></label></div>
               {selectedBlock.type === 'text' && (
                 <div className="journal-inspector__style-grid">
@@ -648,6 +719,7 @@ export function JournalWorkspace({ game, tracks, currentTrack, currentTime = 0, 
               <div className="journal-inspector__actions"><button type="button" className="button button--ghost" onClick={() => commitPage(setJournalBlockZIndex(page, selectedBlock.id, Math.max(...page.blocks.map((item) => item.zIndex), 0) + 1))}>置顶</button><button type="button" className="button button--ghost" onClick={() => commitPage(setJournalBlockZIndex(page, selectedBlock.id, Math.min(...page.blocks.map((item) => item.zIndex), 0) - 1))}>置底</button><button type="button" className="button button--danger" onClick={() => { commitPage(removeJournalBlock(page, selectedBlock.id)); setSelectedBlockId(null); }}><Trash2 size={13} />删除</button></div>
               {selectedAsset && <p className="journal-inspector__hint">素材：{selectedAsset.fileName}</p>}
               {selectedTrack && <p className="journal-inspector__hint">曲目：{selectedTrack.displayName}</p>}
+              {selectedBlock.type === 'play-session' && <p className="journal-inspector__hint">历史快照：{describePlaySnapshot(selectedBlock.snapshot)}</p>}
             </div>
           ) : (
             <div className="journal-inspector__page">

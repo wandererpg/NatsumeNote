@@ -5,7 +5,7 @@ import type Database from 'better-sqlite3';
  * small migrations table.  Keeping both makes the database easy to inspect
  * and gives us a place to add non-destructive migrations in future releases.
  */
-export const LATEST_SCHEMA_VERSION = 8;
+export const LATEST_SCHEMA_VERSION = 9;
 
 type SQLiteDatabase = Database.Database;
 
@@ -202,6 +202,30 @@ export function migrate(db: SQLiteDatabase): void {
     }
 
     db.prepare('INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)').run(8);
+    if (userVersion < 9) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS external_play_sources (
+          id TEXT PRIMARY KEY, label TEXT NOT NULL, authorized_path TEXT NOT NULL UNIQUE,
+          file_identity TEXT NOT NULL, connected_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS external_game_links (
+          local_game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+          source_id TEXT NOT NULL REFERENCES external_play_sources(id) ON DELETE CASCADE,
+          external_game_id INTEGER NOT NULL CHECK(external_game_id > 0),
+          external_name TEXT NOT NULL, external_ids_json TEXT NOT NULL,
+          needs_confirmation INTEGER NOT NULL DEFAULT 0 CHECK(needs_confirmation IN (0,1)),
+          PRIMARY KEY(local_game_id, source_id), UNIQUE(source_id, external_game_id)
+        );
+        CREATE TABLE IF NOT EXISTS game_tag_index (
+          local_game_id TEXT NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+          origin_key TEXT NOT NULL, source_id TEXT REFERENCES external_play_sources(id) ON DELETE CASCADE,
+          provider TEXT NOT NULL CHECK(provider IN ('vndb','bangumi','custom')),
+          name TEXT NOT NULL, PRIMARY KEY(local_game_id, origin_key, provider, name)
+        );
+        CREATE INDEX IF NOT EXISTS idx_game_tag_name ON game_tag_index(name, local_game_id);
+      `);
+      db.prepare('INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)').run(9);
+    }
     db.pragma(`user_version = ${LATEST_SCHEMA_VERSION}`);
   });
 

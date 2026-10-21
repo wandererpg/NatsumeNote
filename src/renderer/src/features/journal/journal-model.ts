@@ -4,10 +4,13 @@ import type {
   JournalMediaBlock,
   JournalPage,
   JournalPageBackground,
+  JournalPlaySessionBlock,
   JournalQuoteBlock,
   JournalTrackBlock,
   JournalTextBlock,
 } from '../../../../shared/types';
+import type { ReinaPlaySnapshot } from '../../../../shared/reina';
+import { clonePlaySnapshot } from './journal-play-session';
 
 export const DEFAULT_JOURNAL_CANVAS = { width: 960, height: 680 } as const;
 export const JOURNAL_CANVAS_STEP = { width: 320, height: 240 } as const;
@@ -120,6 +123,20 @@ export function createJournalDetailsBlock(
     type: 'details',
     ...frame(id, x, y, 360, 280, zIndex),
     source,
+  };
+}
+
+export function createJournalPlaySessionBlock(
+  id: string,
+  snapshot: ReinaPlaySnapshot,
+  x = 96,
+  y = 300,
+  zIndex = 0,
+): JournalPlaySessionBlock {
+  return {
+    type: 'play-session',
+    ...frame(id, x, y, 380, 300, zIndex),
+    snapshot: clonePlaySnapshot(snapshot),
   };
 }
 

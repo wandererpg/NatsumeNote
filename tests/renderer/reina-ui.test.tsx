@@ -1,0 +1,317 @@
+/** @vitest-environment jsdom */
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { ReinaGamePanel } from '../../src/renderer/src/features/reina/ReinaGamePanel';
+import { TagChips } from '../../src/renderer/src/features/reina/TagChips';
+import { useReinaSessions } from '../../src/renderer/src/features/reina/useReinaSessions';
+import type {
+  ReinaEnvelope,
+  ReinaGame,
+  ReinaLink,
+  ReinaSession,
+  ReinaSource,
+  ReinaStats,
+  ReinaTag,
+} from '../../src/shared/reina';
+
+// TagChips selection values are the shared `provider:name` keys.
+function installBridge(api: object): void {
+  Object.defineProperty(window, 'galMusic', { configurable: true, value: api });
+}
+
+afterEach(() => {
+  cleanup();
+  delete (window as unknown as { galMusic?: unknown }).galMusic;
+});
+
+function envelope<T>(data: T, overrides: Partial<ReinaEnvelope<T>> = {}): ReinaEnvelope<T> {
+  return {
+    contractVersion: 1,
+    sourceApp: 'ReinaManager',
+    sourceId: 'reina-main',
+    snapshotId: 'snap-1',
+    fetchedAt: '2026-10-21T09:00:00+08:00',
+    warnings: [],
+    data,
+    nextCursor: null,
+    ...overrides,
+  };
+}
+
+function makeStats(overrides: Partial<ReinaStats> = {}): ReinaStats {
+  return {
+    sourceTotalMinutes: 6000,
+    sourceSessionCount: 80,
+    sourceLastPlayed: '2026-10-20T23:45:00+08:00',
+    sessionTotalMinutes: 30,
+    sessionCount: 1,
+    liveSession: false,
+    ...overrides,
+  };
+}
+
+function makeSession(id: number, minutes = 30): ReinaSession {
+  return {
+    id,
+    gameId: 42,
+    startTime: '2026-10-18T21:00:00+08:00',
+    endTime: '2026-10-18T21:30:00+08:00',
+    sourceDate: '2026-10-18',
+    recordedMinutes: minutes,
+    recordedDurationSeconds: minutes * 60,
+    durationPrecision: 'minute-rounded',
+    trackingMode: 'unknown',
+    recordKind: 'unknown',
+  };
+}
+
+const source: ReinaSource = {
+  id: 'reina-main',
+  label: '主数据库',
+  connectedAt: '2026-10-01T00:00:00+08:00',
+};
+
+const linkedGame: ReinaLink = {
+  localGameId: 'game-2',
+  sourceId: 'reina-main',
+  externalGameId: 77,
+  externalName: 'Summer Pockets Link',
+};
+
+function makeGameApi(overrides: Record<string, unknown> = {}) {
+  return {
+    reinaSources: vi.fn().mockResolvedValue([source]),
+    reinaLinks: vi.fn().mockResolvedValue([]),
+    reinaQuery: vi.fn().mockImplementation(async (tool: string) => (
+      tool === 'reina_get_stats' ? envelope(makeStats()) : envelope([makeSession(1)])
+    )),
+    ...overrides,
+  };
+}
+
+describe('TagChips', () => {
+  it('removes an invalid key again after the provider tag has reappeared', () => {
+    const onToggle = vi.fn();
+    const selected = ['vndb:剧情'];
+    const view = render(<TagChips tags={[]} selected={selected} onToggle={onToggle} />);
+    expect(onToggle).toHaveBeenCalledWith('vndb:剧情');
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    view.rerender(<TagChips tags={[{ name: '剧情', provider: 'vndb' }]} selected={selected} onToggle={onToggle} />);
+    view.rerender(<TagChips tags={[]} selected={selected} onToggle={onToggle} />);
+    expect(onToggle).toHaveBeenCalledTimes(2);
+    expect(onToggle).toHaveBeenLastCalledWith('vndb:剧情');
+  });
+
+  it('collapses to 12 provider-specific chips, dedupes exact pairs, and toggles keys', () => {
+    const tags: ReinaTag[] = Array.from({ length: 15 }, (_, index) => ({
+      name: `标签${index + 1}`,
+      provider: index % 2 === 0 ? 'vndb' : 'bangumi',
+    }));
+    // Exact (provider, name) duplicates dedupe; the same text from another
+    // provider remains a separate chip with its own key.
+    tags.push({ name: '标签1', provider: 'vndb' });
+    tags.push({ name: '共同标签', provider: 'vndb' }, { name: '共同标签', provider: 'bangumi' });
+    const onToggle = vi.fn();
+
+    render(<TagChips tags={tags} selected={['vndb:标签1']} onToggle={onToggle} />);
+
+    expect(screen.getAllByRole('button', { name: /^标签\d+ · (VNDB|Bangumi)$/ })).toHaveLength(12);
+    expect(screen.getAllByRole('button', { name: '标签1 · VNDB' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: '标签1 · VNDB' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/多选为 AND（需同时满足）/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '标签2 · Bangumi' }));
+    expect(onToggle).toHaveBeenCalledWith('bangumi:标签2');
+
+    fireEvent.click(screen.getByRole('button', { name: /展开全部（17）/ }));
+    expect(screen.getByRole('button', { name: '共同标签 · VNDB' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '共同标签 · Bangumi' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '标签15 · VNDB' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '收起' })).toBeInTheDocument();
+  });
+
+  it('toggles the same tag name from different providers independently', () => {
+    const tags: ReinaTag[] = [
+      { name: '剧情', provider: 'vndb' },
+      { name: '剧情', provider: 'bangumi' },
+    ];
+    const onToggle = vi.fn();
+    const view = render(<TagChips tags={tags} selected={['vndb:剧情']} onToggle={onToggle} />);
+
+    const vndb = screen.getByRole('button', { name: '剧情 · VNDB' });
+    const bangumi = screen.getByRole('button', { name: '剧情 · Bangumi' });
+    expect(vndb).toHaveAttribute('aria-pressed', 'true');
+    expect(bangumi).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(bangumi);
+    expect(onToggle).toHaveBeenLastCalledWith('bangumi:剧情');
+    fireEvent.click(vndb);
+    expect(onToggle).toHaveBeenLastCalledWith('vndb:剧情');
+
+    view.rerender(
+      <TagChips tags={tags} selected={['vndb:剧情', 'bangumi:剧情']} onToggle={onToggle} />,
+    );
+    expect(screen.getByRole('button', { name: '剧情 · VNDB' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '剧情 · Bangumi' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('removes an invalid selected key once and explains why', async () => {
+    const onToggle = vi.fn();
+
+    render(
+      <TagChips
+        tags={[{ name: '有效标签', provider: 'vndb' }]}
+        selected={['vndb:有效标签', 'bangumi:已失效标签']}
+        onToggle={onToggle}
+        onClear={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '有效标签 · VNDB' })).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => expect(onToggle).toHaveBeenCalledWith('bangumi:已失效标签'));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/有 1 个筛选条件已失效/)).toBeInTheDocument();
+    expect(screen.getByText('已失效标签（Bangumi）')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '知道了' }));
+    expect(screen.queryByText(/筛选条件已失效/)).toBeNull();
+  });
+});
+
+describe('useReinaSessions', () => {
+  it('drops a late response after the source changes and notifies on refresh', async () => {
+    let resolveOld: (value: ReinaEnvelope<ReinaStats>) => void = () => undefined;
+    const oldResponse = new Promise<ReinaEnvelope<ReinaStats>>((resolve) => {
+      resolveOld = resolve;
+    });
+    const query = vi.fn().mockImplementation(async (tool: string, input: { sourceId: string }) => {
+      if (input.sourceId === 'source-1') return oldResponse;
+      return tool === 'reina_get_stats'
+        ? envelope(makeStats({ sessionCount: 2, sessionTotalMinutes: 70 }), { sourceId: 'source-2' })
+        : envelope([makeSession(2)], { sourceId: 'source-2' });
+    });
+    installBridge({ reinaQuery: query });
+
+    const { result, rerender } = renderHook(
+      ({ sourceId }: { sourceId: string }) => useReinaSessions({ sourceId, gameId: 7 }),
+      { initialProps: { sourceId: 'source-1' } },
+    );
+
+    await waitFor(() => expect(query).toHaveBeenCalled());
+    rerender({ sourceId: 'source-2' });
+    await waitFor(() => expect(result.current.stats?.sessionCount).toBe(2));
+
+    await act(async () => {
+      resolveOld(envelope(makeStats({ sessionCount: 9 }), { sourceId: 'source-1' }));
+      await Promise.resolve();
+    });
+    expect(result.current.stats?.sessionCount).toBe(2);
+
+    const listener = vi.fn();
+    window.addEventListener('reina-tags-changed', listener);
+    act(() => {
+      result.current.refresh();
+    });
+    await waitFor(() => expect(listener).toHaveBeenCalledTimes(1));
+    window.removeEventListener('reina-tags-changed', listener);
+  });
+});
+
+describe('ReinaGamePanel', () => {
+  it('discards a late links response after the game changes', async () => {
+    let resolveFirst: (links: ReinaLink[]) => void = () => undefined;
+    const first = new Promise<ReinaLink[]>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const firstLink: ReinaLink = {
+      localGameId: 'game-1',
+      sourceId: 'reina-main',
+      externalGameId: 42,
+      externalName: 'Game One Link',
+    };
+    const api = makeGameApi({
+      reinaLinks: vi.fn().mockImplementation((localGameId: string) => (
+        localGameId === 'game-1' ? first : Promise.resolve([linkedGame])
+      )),
+    });
+    installBridge(api);
+
+    const { rerender } = render(<ReinaGamePanel gameId="game-1" gameName="Game One" />);
+    await waitFor(() => expect(api.reinaLinks).toHaveBeenCalledWith('game-1'));
+
+    rerender(<ReinaGamePanel gameId="game-2" gameName="Game Two" />);
+    expect(await screen.findByText(/已关联《Summer Pockets Link》/)).toBeInTheDocument();
+
+    await act(async () => {
+      resolveFirst([firstLink]);
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText(/Game One Link/)).toBeNull();
+    expect(screen.getByText(/已关联《Summer Pockets Link》/)).toBeInTheDocument();
+  });
+
+  it('recommends candidates by matched metadata id without auto-binding', async () => {
+    const otherCandidate: ReinaGame = {
+      id: 3,
+      name: 'Other Candidate',
+      externalIds: [{ provider: 'vndb', id: 'v111' }],
+      tags: [],
+      unsupportedTagProviders: [],
+    };
+    const matchedCandidate: ReinaGame = {
+      id: 9,
+      name: 'Matched Candidate',
+      externalIds: [{ provider: 'vndb', id: 'v900' }],
+      tags: [],
+      unsupportedTagProviders: [],
+    };
+    const api = makeGameApi({
+      getGameMetadata: vi.fn().mockResolvedValue({
+        gameId: 'game-1',
+        coverSource: null,
+        sources: [{
+          source: 'vndb',
+          status: 'matched',
+          queryName: 'Game One',
+          externalId: 'v900',
+          title: null,
+          titleCn: null,
+          developer: null,
+          summary: null,
+          score: null,
+          rank: null,
+          fetchedAt: null,
+          errorMessage: null,
+        }],
+      }),
+      reinaQuery: vi.fn().mockImplementation(async (tool: string) => (
+        tool === 'reina_list_games'
+          ? envelope([otherCandidate, matchedCandidate])
+          : envelope([makeSession(1)])
+      )),
+    });
+    installBridge(api);
+
+    render(<ReinaGamePanel gameId="game-1" gameName="Game One" />);
+    // The source is auto-picked after sources+links settle; search requires it.
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: 'ReinaManager 来源' })).toHaveValue('reina-main');
+    });
+    const searchButton = await screen.findByRole('button', { name: '搜索候选' });
+    await waitFor(() => expect(searchButton).toBeEnabled());
+    fireEvent.click(searchButton);
+
+    const radios = await screen.findAllByRole('radio');
+    expect(radios).toHaveLength(2);
+    await waitFor(() => {
+      const ordered = screen.getAllByRole('radio');
+      expect(ordered[0]).toHaveTextContent('Matched Candidate');
+      expect(within(ordered[0] as HTMLElement).getByText('推荐 · 资料 ID 匹配')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/不会自动绑定/)).toBeInTheDocument();
+    expect(screen.getByText('尚未选择候选作品。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '关联此作品' })).toBeDisabled();
+  });
+});

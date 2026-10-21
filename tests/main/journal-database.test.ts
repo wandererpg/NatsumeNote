@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 
-import { migrate } from '../../src/main/database/migrations';
+import { LATEST_SCHEMA_VERSION, migrate } from '../../src/main/database/migrations';
 import { createGame } from '../../src/main/database/queries/games';
 import {
   createJournalPage,
@@ -18,7 +18,7 @@ describe('journal database', () => {
     const db = new Database(':memory:');
     migrate(db);
 
-    expect(db.pragma('user_version', { simple: true })).toBe(8);
+    expect(db.pragma('user_version', { simple: true })).toBe(LATEST_SCHEMA_VERSION);
     expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'journal_pages'").get())
       .toEqual({ name: 'journal_pages' });
     expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'journal_assets'").get())
@@ -105,6 +105,6 @@ it('upgrades a version 6 journal library without changing pages, assets or sound
   migrate(db); migrate(db);
   expect(db.prepare('SELECT * FROM journal_pages').all()).toEqual(pages);
   expect(db.prepare('SELECT * FROM journal_assets').all()).toEqual(assets);
-  expect(db.pragma('user_version', { simple: true })).toBe(8);
+  expect(db.pragma('user_version', { simple: true })).toBe(LATEST_SCHEMA_VERSION);
   expect(db.pragma('integrity_check', { simple: true })).toBe('ok'); db.close();
 });

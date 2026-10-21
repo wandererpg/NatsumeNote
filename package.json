@@ -19,6 +19,7 @@
     "package:win": "npm run rebuild:native && npm run verify:resources && npm run build && electron-builder --win"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
     "@vitejs/plugin-react": "^4.3.1",
     "animejs": "^4.5.0",
     "better-sqlite3": "^11.3.0",
@@ -29,6 +30,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "uuid": "^10.0.0",
+    "zod": "3.25.76",
     "zustand": "^4.5.5"
   },
   "devDependencies": {
