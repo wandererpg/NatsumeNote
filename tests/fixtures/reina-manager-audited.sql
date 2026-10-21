@@ -25,4 +25,5 @@ INSERT INTO seaql_migrations VALUES
 ('m20260805_000018_hikarinagi_oauth',18),
 ('m20260809_000019_add_steam_launch',19),
 ('m20260922_000020_savedata_backup_root_semantics',20),
-('m20260923_000021_tool_integration_defaults',21);
+('m20260923_000021_tool_integration_defaults',21),
+('m20261006_000022_nextmoe_oauth',22);

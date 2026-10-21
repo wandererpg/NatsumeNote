@@ -283,6 +283,30 @@ function expectAdapterError(run: () => unknown, code: ReinaErrorCode): ReinaAdap
 }
 
 describe('ReinaAdapter 连接与 schema 核对', () => {
+  it('兼容 NextMoe 第 22 次迁移，保留分钟统计并且不修改来源', () => {
+    const file = createDb('nextmoe-22.db', (db) => {
+      // Synthetic post-migration layout: OAuth storage and detached Kun IDs
+      // do not change the play-session columns or recorded duration units.
+      db.exec('CREATE TABLE user (id INTEGER PRIMARY KEY, nextmoe_auth TEXT)');
+      insertGame(db, 1, { name: '合成作品' });
+      insertSource(db, 1, 'kun', null, { name: '保留的资料快照' });
+      insertSession(db, 1, 1, 1000, 4600, 12);
+      insertStats(db, 1, 99, 3, 4600);
+    }, { migrations: [...REAL_MIGRATIONS, 'm20261006_000022_nextmoe_oauth'] });
+    const before = fs.readFileSync(file);
+    const adapter = new ReinaAdapter(file);
+    try {
+      expect(adapter.connection()).toMatchObject({ readable: true, liveSession: false });
+      expect(adapter.connection().schemaProfile).toContain('m20261006_000022_nextmoe_oauth');
+      expect(adapter.games()).toEqual([expect.objectContaining({ id: 1, name: '合成作品' })]);
+      expect(adapter.sessions(1)).toEqual([expect.objectContaining({ recordedMinutes: 12, recordedDurationSeconds: 720 })]);
+      expect(adapter.stats(1)).toMatchObject({ sourceTotalMinutes: 99, sessionTotalMinutes: 12 });
+    } finally {
+      adapter.close();
+    }
+    expect(fs.readFileSync(file)).toEqual(before);
+  });
+
   it('报告已核对的 schema profile 与只读能力', () => {
     const adapter = new ReinaAdapter(createDb());
     try {

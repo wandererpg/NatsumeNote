@@ -48,7 +48,7 @@
 - 使用官方 `@modelcontextprotocol/sdk@1.32.1`，通过 `InMemoryTransport` 完成初始化、列举工具与调用；SQLite 查询在 Electron 独立 utilityProcess 内执行，超时会终止进程，下一次查询可重新建立进程。
 - 五个只读工具：`reina_get_connection`、`reina_list_games`、`reina_list_sessions`、`reina_get_stats`、`reina_get_tags`。成功返回结构化信封及快照、读取时间、提示；连接诊断的 snapshotId 为 null。业务错误通过 `isError: true` 返回安全的 `code/message/retryable`，在进程间和 MCP client 保留分类。IPC 按已有应用错误类型映射为可展示消息，不扩展旧消费者的错误枚举。参数校验失败仍由协议报告。
 - 当前是 NatsumeNote 托管的本地兼容桥，不是 ReinaManager 原生 MCP。未开放网络端口、外部 stdio 服务或任意 SQL 工具，也不支持 AI 修改关联或自动写手账。
-- 按参考仓库提交 `89c0c07d2971575109fbb565ef091b59329ca59e` 核对结构与单位；要求具有已核对的 SeaORM 迁移记录和所需表/列。已核对迁移截至 `m20260923_000021_tool_integration_defaults`。无迁移历史、未知迁移或关键列不兼容时拒绝读取。不能保证任意已安装版本都兼容。
+- 按参考仓库提交 `89c0c07d2971575109fbb565ef091b59329ca59e` 核对基础结构与单位，并在 `4d2c9440bdbd088a73e1c4abf95a7b9ae35dc31c` 增量核对第 22 次迁移；要求具有已核对的 SeaORM 迁移记录和所需表/列。现支持截至 `m20261006_000022_nextmoe_oauth` 的已核对迁移。无迁移历史、未知迁移或关键列不兼容时仍拒绝读取。不能保证任意已安装版本都兼容。
 - 来源以 `readonly + fileMustExist + query_only` 打开；不对来源执行迁移、检查点或清理。文件路径仅保存在本地主进程数据库，不返回渲染层或写入手账卡片。
 - 每次快照最多 50,000 条记录或 16 MiB，最多保留 4 个、总计 64 MiB、5 分钟有效；游标绑定来源、作品、范围及工具，过期需刷新。来源目录最多 5,000 个作品、40,000 条资料来源行，每个作品最多 300 个标签。超限会报错，不会静默显示部分会话合计。
 - `get_stats` 可在同一快照覆盖的更小范围内重新计算；超出覆盖范围或请求不存在的作品时返回 INVALID_INPUT。遇到无法解释的会话行，整次读取失败，不提供看似完整的部分累计。相较原方案的“跳过并计数”，首版采用此保守策略；必须修复或核对来源记录后重试。
@@ -56,6 +56,8 @@
 - 本地迁移从 schema 8 升至 9，只增加来源、关联和最小标签索引。没有复制 ReinaManager 的组件或翻译词典。
 
 若读取失败，先核对所选文件是否属于实际使用的 ReinaManager。来源正在保存时可稍后重试；持续占用时可关闭 ReinaManager 后重试。不要用 NatsumeNote 自身数据库作为来源。
+
+含第 22 次 `nextmoe_oauth` 迁移的来源曾被旧开发版误拒绝，现已核对并支持，详见 [兼容修复记录](reina-mcp-compatibility-22.md)。更新后需退出并重新启动 NatsumeNote，再选择原数据库；无需修改来源或删除游玩记录。
 
 ## 开发与验证
 

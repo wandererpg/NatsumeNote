@@ -52,7 +52,7 @@ export const MAX_SOURCE_DATE_LENGTH = 512;
 export const BUSY_TIMEOUT_MS = 500;
 /**
  * 已核对的迁移历史，顺序即 `src-tauri/migration/src/lib.rs` 里 Migrator 的应用顺序
- * （21 个迁移全部读过，截至 `m20260923_000021_tool_integration_defaults`）。
+ * （22 个迁移全部核对，截至 `m20261006_000022_nextmoe_oauth`）。
  *
  * 迁移表是“这不是相似列、而是同一来源结构”的证据，`verifySchema` 因此要求：
  * - 存在 `seaql_migrations` 且带 `version` 列；
@@ -64,6 +64,8 @@ export const BUSY_TIMEOUT_MS = 500;
  *   更早版本的库没有这张表，会被 `verifySchema` 拒绝；
  * - `games.custom_data` 由 000004 加列，同属必需列；
  * - 000015/000019/000020/000021 只给 games/user 增加列，不动本文件读取的任何列；
+ * - 000022 增加 user.nextmoe_auth 并清理/解绑旧 Kun 编号，不改会话/统计列或时长单位；
+ *   增量核对提交 4d2c9440bdbd088a73e1c4abf95a7b9ae35dc31c，见 docs/reina-mcp-compatibility-22.md。
  * - 来源侧一旦删除或改名 `REQUIRED_SCHEMA` 里的列，`verifySchema` 拒绝而不是猜单位。
  */
 const AUDITED_MIGRATIONS: readonly string[] = [
@@ -88,6 +90,7 @@ const AUDITED_MIGRATIONS: readonly string[] = [
   'm20260809_000019_add_steam_launch',
   'm20260922_000020_savedata_backup_root_semantics',
   'm20260923_000021_tool_integration_defaults',
+  'm20261006_000022_nextmoe_oauth',
 ];
 /** 清单成员集合：用于拒绝清单外的迁移（含来源升级后新增的迁移）。 */
 const AUDITED_MIGRATION_SET: ReadonlySet<string> = new Set(AUDITED_MIGRATIONS);

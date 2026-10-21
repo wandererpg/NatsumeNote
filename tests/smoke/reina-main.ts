@@ -29,6 +29,8 @@ void app.whenReady().then(async () => {
   const service = new ReinaService(db, worker);
   try {
     const connection = await service.connectSelectedFile(sourcePath);
+    const diagnostic = await service.query<{schemaProfile:string}>('reina_get_connection',{sourceId:connection.id});
+    assert.ok(diagnostic.data.schemaProfile.includes('m20261006_000022_nextmoe_oauth'));
     assert.equal(service.links('local').length,0);
     await service.query('reina_list_games',{sourceId:connection.id});
     await service.bind({localGameId:'local',sourceId:connection.id,externalGameId:42,externalName:'untrusted'});
