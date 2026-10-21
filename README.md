@@ -14,9 +14,6 @@ GitHub Release 建议上传下面两个压缩包和校验文件：
 | --- | --- |
 | `NatsumeNote-1.1.0-windows-x64-installer.zip` | 安装版。解压后运行 `NatsumeNote-1.1.0-installer/NatsumeNote-1.1.0-x64.exe`，可以选择安装目录，并创建桌面/开始菜单快捷方式。 |
 | `NatsumeNote-1.1.0-windows-x64-portable.zip` | 便携版。解压后直接运行 `NatsumeNote-1.1.0-portable/NatsumeNote.exe`，不会执行安装流程。 |
-| `SHA256SUMS.txt` | 安装程序、两个 ZIP 和更新文件的 SHA-256 校验值。 |
-
-便携版不能只拿出一个 `NatsumeNote.exe` 使用，必须保留旁边的 `resources` 文件夹。安装版和便携版使用同一套应用数据；更新前请先关闭正在运行的旧版 NatsumeNote。
 
 ## 功能
 
@@ -76,64 +73,6 @@ GitHub Release 建议上传下面两个压缩包和校验文件：
 - 手账页面和卡片数据位于 SQLite；导入的图片/视频位于每部作品目录下的 `手账/素材`，页面中的曲目卡只引用现有曲目 ID。
 - 备份时请同时备份数据库文件和整个音乐库目录。只备份数据库会留下没有对应音频或手账素材的记录，单独备份音乐文件也会丢失收藏、播放列表、封面和手账页面。
 
-## 常见问题
-
-### 设置里看不到主题
-
-请确认运行的是当前版本的 `NatsumeNote.exe` 或安装版，而不是旧的 `GalMusic.lnk`/`NatsumeMusic.lnk`。旧快捷方式可能仍然指向旧安装目录；重新运行安装版或直接打开便携版目录中的 `NatsumeNote.exe` 即可。
-
-### 导入游戏后没有找到音乐
-
-请选择游戏根目录而不是某一个内部文件，并开启深度扫描。对于无扩展名资源，软件只会把文件头为 `SM2MPX10` 且容器名为 `WMSC` 的内容识别为音乐；`VOICE*` 需要打开包含语音选项。GARbro 诊断日志位于用户数据目录的 `logs/garbro.log`。
-
-### 如何打开音乐库文件夹
-
-进入“作品音乐”后，点击标题栏右上角的文件夹按钮；也可以点击具体曲目右侧的文件夹按钮。应用会打开资源管理器并定位曲目文件，不会启动系统媒体播放器。默认音乐库位置为 `C:\Users\<用户名>\Music\NatsumeNote`；如果修改过位置，以“设置 → 音乐库位置”显示的路径为准。
-
-### 没有自动封面
-
-先检查导入完成页中的 VNDB/Bangumi 状态。候选不明确、无结果、网络失败和封面下载失败都不会影响播放；打开游戏编辑器后点击“刷新网络资料”，也可以直接选择本地封面。
-
-### 便携版无法启动或提示缺少文件
-
-请重新完整解压 ZIP，不要只复制 `NatsumeNote.exe`。`resources` 文件夹必须与可执行文件保持相邻，且不要从压缩包内直接运行。
-
-## 开发与自行打包
-
-环境要求：Node.js 20 或 22 LTS、Windows x64，以及可正常运行的 npm。当前 `better-sqlite3` 版本不建议配合 Node.js 24 安装依赖。
-
-```powershell
-npm install
-npm run dev
-```
-
-`npm run dev` 会先检查 Electron 能否实际加载 `better-sqlite3`；只有缺失或 ABI 不匹配时才安装对应的官方预编译文件，不要求每次启动都安装 Visual Studio。若预编译下载因证书或网络失败，可先运行 `npm run rebuild:native` 重试。只有明确要从源码编译时，才需要安装 Python 与 Visual Studio 的“使用 C++ 的桌面开发”工作负载，然后运行 `npm run rebuild:native:source`。
-
-验证代码、资源和生产构建：
-
-```powershell
-npm test -- --run
-npx tsc --noEmit
-npm run verify:resources
-npm run build
-```
-
-生成 Windows x64 NSIS 安装包：
-
-```powershell
-npm run package:win
-```
-
-命令完成后，NSIS 安装程序位于 `release/NatsumeNote-1.1.0-x64.exe`。本次 v_1.1 使用独立目录，保留旧构建：
-
-```powershell
-npm run package:win -- --config.directories.output=release-v_1.1 --publish never
-node scripts/smoke-reina.mjs release-v_1.1
-node scripts/verify-release.mjs release-v_1.1
-```
-
-验证脚本核对打包代码、更新文件和原生 SQLite，生成并校验安装版 ZIP、便携版 ZIP 与 `SHA256SUMS.txt`；为避免混入旧文件，拒绝覆盖已有 ZIP。接口检查使用临时合成数据，不操作用户数据库。自行压缩便携版时必须保留整个 `win-unpacked/` 目录，包括 DLL、`locales/` 和 `resources/`。
-
 产物目录结构如下（便携版还包含其他运行文件）：
 
 ```text
@@ -150,11 +89,6 @@ NatsumeNote-1.1.0-windows-x64-portable.zip
 SHA256SUMS.txt
 ```
 
-PowerShell 生成校验值：
-
-```powershell
-Get-FileHash .\NatsumeNote-1.1.0-windows-x64-*.zip -Algorithm SHA256
-```
 
 深度扫描依赖 `resources/tools/garbro/` 下的 GARbro 文件。发布包已经携带这套运行时资源；从源码自行打包前，请先确认资源校验通过，并确认 GARbro 及其依赖允许以你的发布方式再分发。
 
