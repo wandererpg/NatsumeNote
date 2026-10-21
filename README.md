@@ -2,17 +2,22 @@
 
 NatsumeNote 是一款面向 Windows 的 Galgame 音乐播放器与作品手账。选择游戏目录后，它可以递归扫描普通音频和常见资源包，把音乐复制到独立音乐库，并自动抓取作品资料；每部作品还拥有独立的分页白板，可自由摆放便签、图片、视频、引用和曲目卡。
 
-当前发布版本：`0.1.0` · Windows x64 · Electron
+当前版本：`v_1.1`（内部版本 `1.1.0`） · Windows x64 · Electron
 
 源码仓库：[github.com/wandererpg/NatsumeNote](https://github.com/wandererpg/NatsumeNote)
 
-## 开发版更新（尚未重新打包）
+## v_1.1 更新重点（2026-10-22）
 
-开发源码已同步音乐软件的界面、转场与按钮动效、加载提示、设置保存与目录识别修复、资料确认流程，以及 AFA/BGI 等资源格式支持；保留作品概览、人物资料与分页手账。音乐库兼容迁移至 schema 9。
+本版将上次 0.1.0 打包后的开发更新纳入安装包，保留作品概览、人物资料与分页手账。音乐库兼容迁移至 schema 9。
 
-新增 **ReinaManager 游玩记录连接**：在设置中选择来源数据库，可预览并批量导入全部游戏，自动匹配已有作品，为缺少的作品新建文件夹，并逐项手动关联或跳过。确认后可查看游玩时段、会话合计与来源累计，把选中的记录插入手账历史卡片。重复导入沿用已有关联，来源数据库保持只读；作品标签支持展开、多选 AND 筛选和来源标记。采用应用内部 MCP，无需开放端口。详见 [连接与使用说明](docs/reina-mcp-guide.md)。
+- **ReinaManager 游玩记录**：通过应用内部 MCP 只读连接数据库，查看历史总时长、游玩时段与会话明细，并将记录插入手账；无需开放端口，兼容已核对的 NextMoe 数据库结构。
+- **全部作品批量导入**：自动关联已有作品，为缺少的作品新建文件夹，支持手动匹配与跳过。待确认项目会显示原因并定位到对应行，重复导入沿用已有关联。
+- **资料自动匹配与加载修复**：使用已确认关联的 VNDB/Bangumi 编号加载资料，自动恢复旧的无匹配缓存；导入后详情页立即重读关联，保留已有手动选择，网络失败有明确提示。
+- **标签与手账整理**：标签标明来源，支持展开与多选 AND 筛选；游玩历史卡片保留数据来源和原有时长口径。
+- **两端手动同步**：导出同步文件夹，在另一端选择 `manifest.json`，预览后合并歌曲、收藏、播放列表与作品资料。
+- **音乐与交互改进**：同步页面转场、按钮动效和加载提示；纳入设置保存、音乐目录识别、播放暂停、删除后位置保留、资料确认流程以及 AFA/BGI 等资源格式支持。
 
-新增两端手动同步：在设置中导出完整同步文件夹，在另一端选择 `manifest.json`，预览后确认合并歌曲、收藏、播放列表与作品资料。详见 [双向同步操作说明](docs/library-sync-guide.md)。现有 0.1.0 安装包没有被本次源码更新替换。
+详见 [完整更新说明](docs/releases/1.1.0.md)、[ReinaManager 连接说明](docs/reina-mcp-guide.md)和[双向同步操作说明](docs/library-sync-guide.md)。本地新安装包与旧的 0.1.0 产物分目录保存；公开 Release 状态以 GitHub 页面为准。
 
 ## 下载与安装
 
@@ -20,9 +25,9 @@ GitHub Release 建议上传下面两个压缩包和校验文件：
 
 | 文件 | 用途 |
 | --- | --- |
-| `NatsumeNote-0.1.0-windows-x64-installer.zip` | 安装版。解压后运行 `NatsumeNote-0.1.0-installer/NatsumeNote-0.1.0-x64.exe`，可以选择安装目录，并创建桌面/开始菜单快捷方式。 |
-| `NatsumeNote-0.1.0-windows-x64-portable.zip` | 便携版。解压后直接运行 `NatsumeNote-0.1.0-portable/NatsumeNote.exe`，不会执行安装流程。 |
-| `SHA256SUMS.txt` | 两个 ZIP 的 SHA-256 校验值。 |
+| `NatsumeNote-1.1.0-windows-x64-installer.zip` | 安装版。解压后运行 `NatsumeNote-1.1.0-installer/NatsumeNote-1.1.0-x64.exe`，可以选择安装目录，并创建桌面/开始菜单快捷方式。 |
+| `NatsumeNote-1.1.0-windows-x64-portable.zip` | 便携版。解压后直接运行 `NatsumeNote-1.1.0-portable/NatsumeNote.exe`，不会执行安装流程。 |
+| `SHA256SUMS.txt` | 安装程序、两个 ZIP 和更新文件的 SHA-256 校验值。 |
 
 便携版不能只拿出一个 `NatsumeNote.exe` 使用，必须保留旁边的 `resources` 文件夹。安装版和便携版使用同一套应用数据；更新前请先关闭正在运行的旧版 NatsumeNote。
 
@@ -46,7 +51,7 @@ GitHub Release 建议上传下面两个压缩包和校验文件：
 ## 快速开始
 
 1. 启动 NatsumeNote，首次运行时选择音乐库目录。默认目录为 `%USERPROFILE%\Music\NatsumeNote`。
-2. 点击“导入游戏音乐”，选择游戏的根目录，并填写用于显示和网络匹配的游戏名。
+2. 点击“导入游戏数据”，选择游戏的根目录，并填写用于显示和网络匹配的游戏名。
 3. 普通音频可以关闭深度扫描；音频位于 `.xp3`、`.rpa`、`.arc`、`.pak` 或无扩展名游戏资源中时，打开深度扫描。
 4. 如果只想导入配乐，保持“包含语音”关闭。对于 `SM2MPX10` 游戏，`WMSC` 会被识别为音乐，`VOICE1`/`VOICE2` 等容器按选项决定是否导入；`.nwa` 音频会通过随包的 GARbro NWA bridge 转换成标准 WAV。
 5. 等待导入结果。音乐复制完成后，软件会继续显示 VNDB、Bangumi 和本地封面处理结果。
@@ -132,21 +137,27 @@ npm run build
 npm run package:win
 ```
 
-命令完成后，NSIS 安装程序位于 `release/NatsumeNote-0.1.0-x64.exe`。如需生成完整便携目录，可再运行：
+命令完成后，NSIS 安装程序位于 `release/NatsumeNote-1.1.0-x64.exe`。本次 v_1.1 使用独立目录，保留旧构建：
 
 ```powershell
-npx electron-builder --win dir
+npm run package:win -- --config.directories.output=release-v_1.1 --publish never
+node scripts/smoke-reina.mjs release-v_1.1
+node scripts/verify-release.mjs release-v_1.1
 ```
 
-然后把 `release/win-unpacked/` 中的 `NatsumeNote.exe` 和整个 `resources/` 文件夹一起压缩。发布时建议保持下面的目录结构，并使用 ZIP 文件名与校验文件名：
+验证脚本核对打包代码、更新文件和原生 SQLite，生成并校验安装版 ZIP、便携版 ZIP 与 `SHA256SUMS.txt`；为避免混入旧文件，拒绝覆盖已有 ZIP。接口检查使用临时合成数据，不操作用户数据库。自行压缩便携版时必须保留整个 `win-unpacked/` 目录，包括 DLL、`locales/` 和 `resources/`。
+
+产物目录结构如下（便携版还包含其他运行文件）：
 
 ```text
-NatsumeNote-0.1.0-windows-x64-installer.zip
-└─ NatsumeNote-0.1.0-installer/NatsumeNote-0.1.0-x64.exe
+NatsumeNote-1.1.0-windows-x64-installer.zip
+└─ NatsumeNote-1.1.0-installer/NatsumeNote-1.1.0-x64.exe
 
-NatsumeNote-0.1.0-windows-x64-portable.zip
-└─ NatsumeNote-0.1.0-portable/
+NatsumeNote-1.1.0-windows-x64-portable.zip
+└─ NatsumeNote-1.1.0-portable/
    ├─ NatsumeNote.exe
+   ├─ locales/
+   ├─ *.dll 等运行文件
    └─ resources/
 
 SHA256SUMS.txt
@@ -155,7 +166,7 @@ SHA256SUMS.txt
 PowerShell 生成校验值：
 
 ```powershell
-Get-FileHash .\NatsumeNote-0.1.0-windows-x64-*.zip -Algorithm SHA256
+Get-FileHash .\NatsumeNote-1.1.0-windows-x64-*.zip -Algorithm SHA256
 ```
 
 深度扫描依赖 `resources/tools/garbro/` 下的 GARbro 文件。发布包已经携带这套运行时资源；从源码自行打包前，请先确认资源校验通过，并确认 GARbro 及其依赖允许以你的发布方式再分发。
@@ -179,6 +190,6 @@ NatsumeNote 使用独立远程仓库 `git@github.com:wandererpg/NatsumeNote.git`
 
 1. 将源码、`README.md`、必要的许可证和第三方声明放在仓库根目录。
 2. 不要把 `node_modules`、`out`、旧的 `release-v*` 构建目录或用户音乐库提交到源码仓库。
-3. 创建 GitHub Release，建议使用标签 `v0.1.0`。
-4. 在 Release Assets 中上传 `NatsumeNote-0.1.0-windows-x64-installer.zip`、`NatsumeNote-0.1.0-windows-x64-portable.zip` 和 `SHA256SUMS.txt`。
+3. 创建 GitHub Release，建议使用标签 `v_1.1`。
+4. 在 Release Assets 中上传 `NatsumeNote-1.1.0-windows-x64-installer.zip`、`NatsumeNote-1.1.0-windows-x64-portable.zip` 和 `SHA256SUMS.txt`。
 5. 发布前确认 GARbro 和其他随包第三方组件的许可证、版权声明及再分发条件；如需要，请把对应的 `LICENSE`/`NOTICE` 文件一并放入仓库和发布说明。
