@@ -2,6 +2,7 @@ import { Disc3, FolderOpen, MoreHorizontal } from 'lucide-react';
 
 import type { Game } from '../../../../shared/types';
 import { toCoverUrl } from '../../../../shared/cover-url';
+import { useSelectionIndicator } from '../../hooks/useSelectionIndicator';
 
 export interface GameListProps {
   games: Game[];
@@ -38,6 +39,7 @@ export function GameList({
   emptyLabel = '还没有导入游戏',
 }: GameListProps) {
   const selectGame = onSelectGame ?? onGameSelect ?? onSelect;
+  const indicator = useSelectionIndicator(JSON.stringify([selectedGameId, games.map(game => game.id)]), 'button.is-selected');
 
   if (games.length === 0) {
     return (
@@ -49,7 +51,8 @@ export function GameList({
   }
 
   return (
-    <div className="game-list" data-testid="game-list">
+    <div className="game-list" data-testid="game-list" ref={indicator.ref}>
+      <span className="selection-indicator" aria-hidden="true" style={indicator.style} />
       {games.map((game) => (
         <div className="game-list__item-shell" key={game.id}>
           <button

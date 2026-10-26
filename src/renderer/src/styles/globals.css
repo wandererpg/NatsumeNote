@@ -868,7 +868,7 @@ button:not(:disabled) {
 .game-room__tabs button:hover { color: var(--paper-0); background: color-mix(in srgb, var(--teal-0) 7%, transparent); }
 .game-room__tabs button.is-active { color: var(--teal-0); background: color-mix(in srgb, var(--teal-0) 12%, transparent); }
 .game-room__tabs button.is-active::after { position: absolute; right: 15px; bottom: -11px; left: 15px; height: 2px; background: var(--teal-0); content: ''; }
-.game-room > :is(.game-overview, .track-section, .journal-workspace, .empty-state, .loading-state) { animation: room-enter 280ms ease both; }
+.game-room > :is(.game-overview, .journal-workspace) { animation: room-enter 180ms var(--ease-out); }
 .game-room > .track-kind-filter { margin-top: 18px; }
 .game-overview { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1.5fr) minmax(220px, .65fr); gap: clamp(24px, 4vw, 56px); padding: clamp(30px, 5vw, 62px); border: 1px solid var(--line-strong); border-top: 0; border-radius: 0 0 18px 18px; background: color-mix(in srgb, var(--panel-bg) 88%, transparent); }
 .game-overview__cover { align-self: start; display: grid; width: 100%; aspect-ratio: .72; place-items: center; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 14px; color: var(--teal-0); background: var(--ink-2); box-shadow: 0 18px 38px rgba(3, 10, 14, .3); font-size: 24px; font-weight: 800; letter-spacing: .12em; }
@@ -1083,6 +1083,25 @@ select:focus-visible, a:focus-visible { outline: 2px solid var(--teal-0); outlin
 .sidebar__nav-item.is-active { background: transparent; box-shadow: none; }
 .track-kind-filter .selection-indicator { background: color-mix(in srgb, var(--teal-0) 17%, transparent); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .track-kind-filter button.is-active { background: transparent; box-shadow: none; }
+/* Stable equal-width segments: the highlight can slide even after remounting. */
+.track-kind-filter { display: inline-grid; grid-template-columns: repeat(3, minmax(64px, 1fr)); gap: 0; padding: 4px; }
+.track-kind-filter button { position: relative; z-index: 1; }
+.track-kind-filter__selection { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 3); border-radius: 6px; pointer-events: none; background: color-mix(in srgb, var(--teal-0) 17%, transparent); box-shadow: inset 0 0 0 1px var(--line-strong); transition: transform 210ms cubic-bezier(.22, .75, .25, 1); }
+.track-results { min-width: 0; margin-top: 24px; }
+.track-results > .track-section { margin-top: 0; }
+.track-results[data-ready="true"] { animation: track-results-enter 180ms var(--ease-out); }
+@keyframes track-results-enter { from { opacity: .45; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+.game-list { position: relative; isolation: isolate; }
+.game-list .selection-indicator { z-index: 0; border-radius: 9px; box-shadow: inset 0 0 0 1px var(--line-strong), inset 3px 0 0 var(--teal-0); }
+.game-list__item-shell { z-index: 1; }
+.game-list .game-list__item.is-selected { border-color: transparent; background: transparent; }
+.app-shell[data-input-modality="keyboard"] .track-kind-filter__selection { transition: none; }
+.app-shell[data-input-modality="keyboard"] .track-results { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .track-kind-filter__selection { transition: none; }
+  .track-results { animation: none; }
+}
+
 [data-theme="record-shop"] .sidebar__nav .selection-indicator { box-shadow: inset 6px 0 var(--teal-0); }
 [data-theme="record-shop"] .sidebar__nav-item.is-active { box-shadow: none; }
 .row-action { transition: color var(--motion-fast) ease, background var(--motion-fast) ease, transform 120ms var(--ease-out); }

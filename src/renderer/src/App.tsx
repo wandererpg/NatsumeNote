@@ -7,6 +7,7 @@ import { ChevronRight, Import, LibraryBig, Play } from 'lucide-react';
 import type { LibrarySection, Playlist, AppSettings, BulkTrackOperation, Game, GameMetadataSummary, GameUpdate, MetadataSource, ScanResult, Track, TrackKind } from '../../shared/types';
 import { TrackTable } from './components/library/TrackTable';
 import { TrackLoadingState } from './components/library/TrackLoadingState';
+import { TrackKindFilter } from './components/library/TrackKindFilter';
 import { GameEditor } from './components/library/GameEditor';
 import { PlaylistPicker } from './components/library/PlaylistPicker';
 import { TrackEditor } from './components/library/TrackEditor';
@@ -30,7 +31,6 @@ import { usePlayerStore } from './stores/playerStore';
 import { useUiStore } from './stores/uiStore';
 import { toAppearanceStyle } from './theme/appearance';
 import { useNavigationMotion } from './hooks/useNavigationMotion';
-import { useSelectionIndicator } from './hooks/useSelectionIndicator';
 
 export interface AppProps {
   onPlayTrack?: (track: Track) => void;
@@ -226,7 +226,6 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
   const selectionEnabled = activeSection === 'library' && Boolean(selectedGameId);
   const viewKey = `${activeSection}:${selectedGameId ?? ''}:${selectedPlaylistId ?? ''}`;
   const navigate = useNavigationMotion(mainContentRef, viewKey);
-  const kindIndicator = useSelectionIndicator(`${viewKey}:${trackKindFilter ?? 'all'}`);
 
   useEffect(() => {
     if (mainContentRef.current) mainContentRef.current.scrollTop = 0;
@@ -595,11 +594,7 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
 
                 {gameViewMode === 'tracks' && (
                   <>
-                    <div className="track-kind-filter" role="group" aria-label="曲目分类">
-                      {([[null, '全部'], ['music', '音乐'], ['voice', '语音']] as const).map(([kind, label]) => (
-                        <button key={label} type="button" aria-pressed={trackKindFilter === kind} className={trackKindFilter === kind ? 'is-active' : ''} onClick={() => setTrackKindFilter(kind)}>{label}</button>
-                      ))}
-                    </div>
+                    <TrackKindFilter value={trackKindFilter} onChange={setTrackKindFilter} />
                     {bulkResultNotice && (
                       <div className="bulk-result-summary" role="status">
                         <strong>成功 {bulkResultNotice.succeededCount} 首，失败 {bulkResultNotice.failures.length} 首</strong>
@@ -614,18 +609,20 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
                         )}
                       </div>
                     )}
-                    {isLoadingTracks ? (
-                      <TrackLoadingState />
-                    ) : tracks.length === 0 ? (
-                      <EmptyState tone="tracks" title={searchText ? '没有匹配的曲目' : '这部作品暂无曲目'} description={searchText ? '换个关键词试试，或清空搜索返回当前列表。' : '导入音乐后，曲目会显示在这部作品的音乐空间。'} actionLabel={searchText ? '清空搜索' : '导入曲目'} onAction={() => searchText ? setSearchText('') : handleImport()} />
-                    ) : (
-                      <section className="track-section" aria-labelledby="track-section-title">
-                        <div className="track-section__heading"><div><h2 id="track-section-title">作品音乐</h2><span>{tracks.length} 首曲目</span></div><div className="track-section__tools"><button className="icon-button icon-button--small" type="button" aria-label="打开曲目文件夹" title="打开曲目文件夹" onClick={() => currentTrack && void handleOpenFolder(currentTrack)}><FolderOpen size={15} aria-hidden="true" /></button></div></div>
-                        {selectionEnabled && selectedTrackIds.size > 0 && <BulkTrackToolbar count={selectedTrackIds.size} busy={bulkBusy} onFavorite={() => { void runBulk({ type: 'favorite', isFavorite: true }); }} onUnfavorite={() => { void runBulk({ type: 'favorite', isFavorite: false }); }} onMove={() => setBulkDialog('move')} onAddToPlaylist={() => setBulkDialog('playlist')} onDelete={() => setBulkDialog('delete')} onClear={() => setSelectedTrackIds(new Set())} />}
-                        <TrackTable tracks={tracks} playingTrackId={isPlaying ? currentTrack?.id : null} onPlayTrack={activateTrack} onRename={(track) => { setEditingTrack(track); setCurrentModal('track-edit'); }} onToggleFavorite={(track) => { void toggleFavorite(track); }} onAddToPlaylist={(track) => { setPlaylistTrack(track); setCurrentModal('playlist-add'); }} onDelete={(track) => void deleteTrack(track.id)} onOpenFolder={handleOpenFolder} selectionEnabled={selectionEnabled} selectedTrackIds={selectedTrackIds} onSelectionChange={setSelectedTrackIds} selectionDisabled={bulkBusy} scrollContainerRef={mainContentRef}
-                              scrollResetKey={`${viewKey}:${searchText}:${trackKindFilter ?? ''}:${gameViewMode}`} />
-                      </section>
-                    )}
+                    <div className="track-results" key={`${selectedGameId}:${trackKindFilter ?? 'all'}`} data-ready={!isLoadingTracks} aria-busy={isLoadingTracks}>
+                      {isLoadingTracks ? (
+                        <TrackLoadingState />
+                      ) : tracks.length === 0 ? (
+                        <EmptyState tone="tracks" title={searchText ? '没有匹配的曲目' : '这部作品暂无曲目'} description={searchText ? '换个关键词试试，或清空搜索返回当前列表。' : '导入音乐后，曲目会显示在这部作品的音乐空间。'} actionLabel={searchText ? '清空搜索' : '导入曲目'} onAction={() => searchText ? setSearchText('') : handleImport()} />
+                      ) : (
+                        <section className="track-section" aria-labelledby="track-section-title">
+                          <div className="track-section__heading"><div><h2 id="track-section-title">作品音乐</h2><span>{tracks.length} 首曲目</span></div><div className="track-section__tools"><button className="icon-button icon-button--small" type="button" aria-label="打开曲目文件夹" title="打开曲目文件夹" onClick={() => currentTrack && void handleOpenFolder(currentTrack)}><FolderOpen size={15} aria-hidden="true" /></button></div></div>
+                          {selectionEnabled && selectedTrackIds.size > 0 && <BulkTrackToolbar count={selectedTrackIds.size} busy={bulkBusy} onFavorite={() => { void runBulk({ type: 'favorite', isFavorite: true }); }} onUnfavorite={() => { void runBulk({ type: 'favorite', isFavorite: false }); }} onMove={() => setBulkDialog('move')} onAddToPlaylist={() => setBulkDialog('playlist')} onDelete={() => setBulkDialog('delete')} onClear={() => setSelectedTrackIds(new Set())} />}
+                          <TrackTable tracks={tracks} playingTrackId={isPlaying ? currentTrack?.id : null} onPlayTrack={activateTrack} onRename={(track) => { setEditingTrack(track); setCurrentModal('track-edit'); }} onToggleFavorite={(track) => { void toggleFavorite(track); }} onAddToPlaylist={(track) => { setPlaylistTrack(track); setCurrentModal('playlist-add'); }} onDelete={(track) => void deleteTrack(track.id)} onOpenFolder={handleOpenFolder} selectionEnabled={selectionEnabled} selectedTrackIds={selectedTrackIds} onSelectionChange={setSelectedTrackIds} selectionDisabled={bulkBusy} scrollContainerRef={mainContentRef}
+                                scrollResetKey={`${viewKey}:${searchText}:${trackKindFilter ?? ''}:${gameViewMode}`} />
+                        </section>
+                      )}
+                    </div>
                   </>
                 )}
 

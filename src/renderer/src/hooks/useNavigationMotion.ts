@@ -12,6 +12,7 @@ export function useNavigationMotion(container: RefObject<HTMLElement>, viewKey: 
   const animation = useRef<JSAnimation | null>(null);
   const exitingView = useRef<HTMLElement | null>(null);
   const enterNext = useRef(false);
+  const axis = useRef<'X' | 'Y'>('Y');
 
   const stop = useCallback(() => {
     if (timer.current !== null) clearTimeout(timer.current);
@@ -48,10 +49,12 @@ export function useNavigationMotion(container: RefObject<HTMLElement>, viewKey: 
       return;
     }
     pending.current = { destination, commit };
+    axis.current = destination.startsWith('library:') && key.current.startsWith('library:')
+      && destination !== 'library::' && key.current !== 'library::' ? 'X' : 'Y';
     exitingView.current = view;
     view.inert = true;
     animation.current = animate(view, {
-      opacity: [1, 0.55], y: [0, -4], duration: EXIT_MS, ease: 'outQuad',
+      opacity: [1, 0.55], transform: ['translate(0px, 0px)', `translate${axis.current}(-4px)`], duration: EXIT_MS, ease: 'outQuad',
     });
     // Navigation is bounded by a timer, independent of animation frames. A
     // background window or a slow frame must never hold navigation open.
@@ -72,7 +75,7 @@ export function useNavigationMotion(container: RefObject<HTMLElement>, viewKey: 
     const view = container.current?.querySelector<HTMLElement>('.library-view');
     if (view && enterNext.current && motionAllowed()) {
       animation.current = animate(view, {
-        opacity: [0.55, 1], y: [6, 0], duration: ENTER_MS, ease: 'outCubic',
+        opacity: [0.55, 1], transform: [`translate${axis.current}(8px)`, 'translate(0px, 0px)'], duration: ENTER_MS, ease: 'outCubic',
         onComplete: () => {
           animation.current?.revert();
           animation.current = null;
