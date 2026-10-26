@@ -88,8 +88,10 @@ function createApi(page: JournalPage) {
   };
 }
 
-function renderWorkspace(target: Game = game) {
-  return render(<JournalWorkspace game={target} tracks={[track]} onPlayTrack={vi.fn()} onSeekTo={vi.fn()} />);
+async function renderWorkspace(target: Game = game) {
+  const view = render(<JournalWorkspace game={target} tracks={[track]} onPlayTrack={vi.fn()} onSeekTo={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('button', { name: '切换属性面板' }));
+  return view;
 }
 
 function savedPlayCard(api: ReturnType<typeof createApi>): JournalPlaySessionBlock {
@@ -108,7 +110,7 @@ describe('JournalWorkspace play-session picker', () => {
     const api = createApi(createPage());
     Object.defineProperty(window, 'galMusic', { configurable: true, value: api });
 
-    renderWorkspace();
+    await renderWorkspace();
 
     const insertButton = await screen.findByRole('button', { name: /插入卡片（2）/ });
     expect(screen.getByLabelText('选择 2026-10-20 23:00–23:45 的游玩记录')).toBeChecked();
@@ -148,7 +150,7 @@ describe('JournalWorkspace play-session picker', () => {
     const api = createApi(createPage());
     Object.defineProperty(window, 'galMusic', { configurable: true, value: api });
 
-    renderWorkspace();
+    await renderWorkspace();
 
     const picker = await screen.findByRole('region', { name: '游玩记录' });
     const olderSession = await within(picker).findByLabelText('选择 2026-10-18 21:00–21:30 的游玩记录');
@@ -168,7 +170,7 @@ describe('JournalWorkspace play-session picker', () => {
     const api = createApi(createPage());
     Object.defineProperty(window, 'galMusic', { configurable: true, value: api });
 
-    renderWorkspace(otherGame);
+    await renderWorkspace(otherGame);
 
     expect(await screen.findByText('尚未绑定 Reina 来源，先在设置中完成绑定。')).toBeInTheDocument();
     expect(screen.queryAllByRole('button', { name: /插入卡片/ })).toHaveLength(0);
@@ -191,7 +193,7 @@ describe('JournalWorkspace play-session picker', () => {
     };
     Object.defineProperty(window, 'galMusic', { configurable: true, value: api });
 
-    renderWorkspace();
+    await renderWorkspace();
 
     expect(await screen.findByText('读取游玩记录失败：Reina 离线')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
@@ -212,7 +214,7 @@ describe('JournalWorkspace play-session picker', () => {
     };
     Object.defineProperty(window, 'galMusic', { configurable: true, value: api });
 
-    const { rerender } = renderWorkspace();
+    const { rerender } = await renderWorkspace();
     expect(await screen.findByText('读取游玩记录…')).toBeInTheDocument();
 
     rerender(<JournalWorkspace game={otherGame} tracks={[track]} onPlayTrack={vi.fn()} onSeekTo={vi.fn()} />);
@@ -261,7 +263,7 @@ describe('JournalWorkspace play-session picker', () => {
     };
     Object.defineProperty(window, 'galMusic', { configurable: true, value: api });
 
-    renderWorkspace();
+    await renderWorkspace();
     fireEvent.click(await screen.findByRole('button', { name: '加载更多' }));
 
     // Switch source while the first page request is still in flight.

@@ -22,6 +22,8 @@ github-release-staging-v*/
 .superpowers/brainstorm/
 .vite/
 artifacts/reina-ui/
+artifacts/journal-ui/
+.journal-ui-smoke-*/
 coverage/
 *.log
 *.tsbuildinfo
