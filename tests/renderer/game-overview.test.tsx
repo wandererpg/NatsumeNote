@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { GameOverview } from '../../src/renderer/src/components/library/GameOverview';
@@ -23,11 +23,13 @@ const metadata: GameMetadataSummary = {
 describe('GameOverview summary translation', () => {
   afterEach(() => cleanup());
 
-  it('explains a failed metadata load and keeps the editor available for retry', () => {
+  it('keeps the editor available without inserting network failure instructions into the archive', () => {
     const onEdit = vi.fn();
     render(<GameOverview game={game} metadata={{ ...metadata, sources: [{ ...metadata.sources[0],
-      status: 'failed', summary: null, errorMessage: 'fetch failed' }] }} onEdit={onEdit} />);
-    expect(screen.getByRole('status', { name: '作品资料加载提示' })).toHaveTextContent('VNDB 资料暂时加载失败');
+      status: 'failed', summary: null, errorMessage: 'fetch failed' }] }} error="Bangumi 资料暂时加载失败" onEdit={onEdit} />);
+    expect(screen.queryByRole('status', { name: '作品资料加载提示' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/资料暂时加载失败|刷新重试|已导入的作品和游玩记录仍可使用/)).not.toBeInTheDocument();
+    expect(screen.getByText('暂未收录作品简介。')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '编辑作品资料' }));
     expect(onEdit).toHaveBeenCalledOnce();
   });
@@ -101,5 +103,31 @@ describe('GameOverview summary translation', () => {
     expect(screen.getByRole('heading', { name: '主创团队' })).toBeInTheDocument();
     expect(screen.getByText('Asuta Konno')).toBeInTheDocument();
     expect(screen.getByText('剧本')).toBeInTheDocument();
+  });
+
+  it('puts source-aware tags in the right information rail and keeps their navigation action', () => {
+    const onSelectTag = vi.fn();
+    render(<GameOverview game={game} metadata={{ ...metadata, sources: [{ ...metadata.sources[0], tags: ['夏日', '机器人'] }] }} onEdit={vi.fn()} onSelectTag={onSelectTag} />);
+    const rail = screen.getByRole('complementary', { name: '作品信息' });
+    const tags = within(rail).getByRole('group', { name: '作品标签' });
+    fireEvent.click(within(tags).getByRole('button', { name: '夏日 · VNDB' }));
+    expect(onSelectTag).toHaveBeenCalledWith('vndb:夏日');
+    expect(within(rail).queryByText(/多选为 AND/)).not.toBeInTheDocument();
+    expect(within(rail).queryByRole('button', { name: '清空筛选' })).not.toBeInTheDocument();
+    expect(screen.queryByText('已保存的游玩记录')).not.toBeInTheDocument();
+  });
+
+  it('keeps all staff entries reachable in the focusable scrolling list', () => {
+    const staff = Array.from({ length: 24 }, (_, index) => ({
+      externalId: `s${index}`, name: `主创 ${index + 1}`, originalName: null, role: 'scenario',
+      imageUrl: null, sourceUrl: `https://vndb.org/s${index}`,
+    }));
+    render(<GameOverview game={game} metadata={{ ...metadata, sources: [{ ...metadata.sources[0], staff }] }} onEdit={vi.fn()} />);
+    const list = screen.getByRole('list', { name: '主创团队名单' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(24);
+    expect(within(list).getByRole('link', { name: /主创 24/ })).toBeInTheDocument();
+    expect(list).toHaveAttribute('tabindex', '0');
+    list.focus();
+    expect(list).toHaveFocus();
   });
 });

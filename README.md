@@ -14,8 +14,11 @@ NatsumeNote 是一款面向 Windows 的 Galgame 音乐播放器与作品手账�
 - **操作与动效**：复用 Anime.js 加入页面、卡片和属性面板过渡；支持减少动态效果、键盘切页与移动、拖动取消和整页适配。
 - **编辑保存**：保存期间继续输入会顺序写入；快速离开会补存，写入失败的草稿在应用运行期间可恢复并重试。
 - **作品隔离**：避免延迟返回的创建、素材导入或删除结果影响其他作品；创建新页期间继续输入会先保存再切页。
+- **档案与游玩记录**：作品简介、主创名单改为局部滚动，标签移至右栏；清理简介来源尾注，把游玩记录移到与作品资料同级的独立栏目。
 
 本地直接打开 `release-v_1.2/win-unpacked/NatsumeNote.exe`；也可运行 `release-v_1.2/NatsumeNote-1.2.0-x64.exe` 安装。旧版目录和旧快捷方式仍指向旧版本。
+
+2026-10-27 的档案布局调整版位于 `release-v_1.2-update/`，直接运行其中 `win-unpacked/NatsumeNote.exe` 即可；原 `release-v_1.2/` 保留。
 
 详见 [完整更新说明](docs/releases/1.2.0.md)、[ReinaManager 连接说明](docs/reina-mcp-guide.md)和[双向同步操作说明](docs/library-sync-guide.md)。本地新安装包与旧的 0.1.0 产物分目录保存；公开 Release 状态以 GitHub 页面为准。
 

@@ -1,6 +1,6 @@
 import { Sidebar } from './components/layout/Sidebar';
 import { PlaylistEditor } from './components/library/PlaylistEditor';
-import { AlertCircle, ArrowLeft, BookOpen, Disc3, FolderOpen, Info, Music2, Pencil } from 'lucide-react';
+import { AlertCircle, ArrowLeft, BookOpen, Clock3, Disc3, FolderOpen, Info, Music2, Pencil } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Import, LibraryBig, Play } from 'lucide-react';
 
@@ -17,6 +17,7 @@ import { BulkTrackToolbar } from './components/library/BulkTrackToolbar';
 import { GameOverview } from './components/library/GameOverview';
 import { GameShelf } from './components/library/GameShelf';
 import { TagChips } from './features/reina/TagChips';
+import { ReinaGamePanel } from './features/reina/ReinaGamePanel';
 import { useGameTagFilter } from './hooks/useGameTagFilter';
 import { useGameMetadata } from './hooks/useGameMetadata';
 import { PlayerBar, type PlayerBarProps, type PlayerBarState } from './components/layout/PlayerBar';
@@ -71,7 +72,7 @@ interface BulkResultNotice {
   warning?: string;
 }
 
-type GameViewMode = 'overview' | 'tracks' | 'journal';
+type GameViewMode = 'overview' | 'records' | 'tracks' | 'journal';
 
 export default function App({ onPlayTrack, playTrack: playTrackProp, playerState, playerActions, onImport }: AppProps) {
   const games = useLibraryStore((state) => state.games);
@@ -586,11 +587,14 @@ export default function App({ onPlayTrack, playTrack: playTrackProp, playerState
 
                 <nav className="game-room__tabs" aria-label="作品空间">
                   <button type="button" aria-label="打开作品资料" className={gameViewMode === 'overview' ? 'is-active' : ''} aria-current={gameViewMode === 'overview' ? 'page' : undefined} onClick={() => setGameViewMode('overview')}><Info size={15} aria-hidden="true" />作品资料</button>
+                  <button type="button" aria-label="打开游玩记录" className={gameViewMode === 'records' ? 'is-active' : ''} aria-current={gameViewMode === 'records' ? 'page' : undefined} onClick={() => setGameViewMode('records')}><Clock3 size={15} aria-hidden="true" />游玩记录</button>
                   <button type="button" aria-label="打开音乐空间" className={gameViewMode === 'tracks' ? 'is-active' : ''} aria-current={gameViewMode === 'tracks' ? 'page' : undefined} onClick={() => setGameViewMode('tracks')}><Music2 size={15} aria-hidden="true" />音乐</button>
                   <button type="button" aria-label="打开手账空间" className={gameViewMode === 'journal' ? 'is-active' : ''} aria-current={gameViewMode === 'journal' ? 'page' : undefined} onClick={() => setGameViewMode('journal')}><BookOpen size={15} aria-hidden="true" />手账</button>
                 </nav>
 
                 {gameViewMode === 'overview' && <GameOverview key={selectedGame.id} game={selectedGame} metadata={selectedGameMetadata} loading={isLoadingGameMetadata} error={gameMetadataError} onEdit={() => { void openGameEditor(selectedGame); }} onTranslateSummary={(source) => translateGameSummary(selectedGame.id, source)} onSelectTag={tag => { gameTagFilter.toggle(tag); returnToShelf(); }} />}
+
+                {gameViewMode === 'records' && <section className="game-records" aria-label="游玩记录"><ReinaGamePanel key={selectedGame.id} gameId={selectedGame.id} gameName={selectedGame.name} /></section>}
 
                 {gameViewMode === 'tracks' && (
                   <>
