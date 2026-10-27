@@ -227,7 +227,7 @@ button:not(:disabled) {
 }
 
 .title-bar__leading { min-width: 224px; gap: 10px; }
-.title-bar__actions { gap: 2px; margin-left: auto; }
+.title-bar__actions { flex-shrink: 0; gap: 2px; margin-left: auto; }
 .title-bar__menu { margin-right: 5px; }
 
 .brand-mark { position: relative; width: 28px; height: 28px; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface-active); }
@@ -245,7 +245,7 @@ button:not(:disabled) {
 .brand-lockup__name { color: var(--paper-0); font-size: 14px; font-weight: 650; letter-spacing: -.02em; }
 .brand-lockup__hint { color: var(--muted-1); font-size: 11px; font-weight: 400; letter-spacing: .08em; }
 
-.global-search { display: flex; flex: 1 1 460px; align-items: center; gap: 10px; max-width: 520px; height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted-0); background: var(--panel-soft); transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease; -webkit-app-region: no-drag; }
+.global-search { display: flex; flex: 1 1 460px; align-items: center; gap: 10px; min-width: 0; max-width: 520px; height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted-0); background: var(--panel-soft); transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease; -webkit-app-region: no-drag; }
 
 .global-search:focus-within { border-color: var(--teal-0); box-shadow: 0 0 0 3px var(--surface-active); }
 .global-search input { flex: 1; min-width: 0; border: 0; outline: 0; color: var(--paper-0); background: transparent; font-size: 13px; }
@@ -821,7 +821,7 @@ button:not(:disabled) {
 .app-shell--archive .title-bar { flex-basis: 62px; padding-inline: 18px 12px; }
 .app-shell--archive .title-bar__leading { min-width: 248px; }
 .title-bar__back { margin-right: 2px; }
-.title-bar__import { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 11px; border-radius: 7px; color: var(--teal-0); background: color-mix(in srgb, var(--teal-0) 10%, transparent); font-size: 11px; font-weight: 750; }
+.title-bar__import { display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; min-height: 30px; padding: 0 11px; border-radius: 7px; color: var(--teal-0); background: color-mix(in srgb, var(--teal-0) 10%, transparent); font-size: 11px; font-weight: 750; white-space: nowrap; }
 .title-bar__import:hover { background: color-mix(in srgb, var(--teal-0) 18%, transparent); }
 .app-shell--archive .main-content { padding: 32px clamp(24px, 3.5vw, 58px) 56px; }
 .game-shelf { width: min(100%, 1640px); margin: 0 auto; }
@@ -1089,7 +1089,7 @@ select:focus-visible, a:focus-visible { outline: 2px solid var(--teal-0); outlin
 /* Keyboard navigation is immediate. Pointer interactions retain feedback. */
 .sidebar__nav, .track-kind-filter { position: relative; isolation: isolate; }
 .selection-indicator { position: absolute; top: 0; left: 0; z-index: -1; border-radius: 8px; background: var(--surface-active); pointer-events: none; transition: transform 180ms var(--ease-out), width 180ms var(--ease-out), height 180ms var(--ease-out), opacity var(--motion-fast) ease; }
-.sidebar__nav .selection-indicator { box-shadow: inset 3px 0 var(--teal-0); }
+.sidebar__nav .selection-indicator { max-width: 100%; box-shadow: inset 3px 0 var(--teal-0); }
 .sidebar__nav-item.is-active { background: transparent; box-shadow: none; }
 .track-kind-filter .selection-indicator { background: color-mix(in srgb, var(--teal-0) 17%, transparent); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .track-kind-filter button.is-active { background: transparent; box-shadow: none; }

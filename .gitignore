@@ -25,9 +25,11 @@ artifacts/reina-ui/
 artifacts/journal-ui/
 artifacts/game-overview-ui/
 artifacts/play-chart-ui/
+artifacts/browser-preview-ui/
 .journal-ui-smoke-*/
 .game-overview-smoke-*/
 .play-chart-smoke-*/
+.browser-preview-smoke-*/
 coverage/
 *.log
 *.tsbuildinfo
