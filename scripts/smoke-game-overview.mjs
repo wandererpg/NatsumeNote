@@ -27,7 +27,7 @@ try {
         await settle();
         fs.writeFileSync(path.join(${JSON.stringify(artifacts)}, name+'.png'), (await window.webContents.capturePage()).toPNG());
       };
-      const scenarios = [['default',1440,960],['narrow',960,640],['light',1440,960],['bilingual',1440,960],['short',1440,960],['six-characters',1440,960],['six-narrow',960,640],['staff-only',1440,960],['characters-only',1440,960],['stacked',760,900],['long-title',1440,960]];
+      const scenarios = [['default',1440,960],['right-long',1440,960],['narrow',960,640],['light',1440,960],['bilingual',1440,960],['short',1440,960],['six-characters',1440,960],['six-narrow',960,640],['staff-only',1440,960],['characters-only',1440,960],['stacked',760,900],['long-title',1440,960]];
       for (const [mode,width,height] of scenarios) {
         console.log('Overview check: '+mode);
         window.setContentSize(width,height);
@@ -47,8 +47,14 @@ try {
           const team=document.querySelector('.game-archive-details__staff');
           const tags=document.querySelector('[role="group"][aria-label="作品标签"]');
           const summary=document.querySelector('.summary-reader__scroll');
+          const edit=document.querySelector('.game-overview__main > .button');
           const staff=document.querySelector('.staff-list');
           const body=document.body.textContent;
+          const imageProbe=document.createElement('img');
+          imageProbe.style.display='none';
+          cover.append(imageProbe);
+          const coverObjectFit=getComputedStyle(imageProbe).objectFit;
+          imageProbe.remove();
           const bounds=element=>{
             if(!element)return null;
             const {top,bottom,left,right,height,width}=element.getBoundingClientRect();
@@ -67,7 +73,7 @@ try {
             records: body.includes('已保存的游玩记录'),
             languageBlocks: summary.querySelectorAll('.summary-reader__text').length,
             theme: document.documentElement.dataset.theme,
-            columns, cover:bounds(cover),main:bounds(main),facts:bounds(facts),details:bounds(details),characters:bounds(characters),team:bounds(team),staff:bounds(staff),
+            columns, coverObjectFit,cover:bounds(cover),main:bounds(main),facts:bounds(facts),summary:bounds(summary),edit:bounds(edit),details:bounds(details),characters:bounds(characters),team:bounds(team),staff:bounds(staff),
           };
         });
         const hasStaff=mode!=='characters-only';
@@ -77,7 +83,10 @@ try {
         if(state.overflow||!state.tagsRight||state.summaryScrollable!==scrollSummary||state.staffScrollable!==hasStaff||state.staffCount!==(hasStaff?40:0)||state.oldNotice||state.sourceMarkup||state.records||(mode==='bilingual'&&state.languageBlocks!==2)||(mode==='light'&&state.theme!=='aquarium-glass')) {
           throw new Error('Overview layout/state failed: '+mode+' '+JSON.stringify(state));
         }
-        if(width>800&&(state.columns!==3||!aligned([state.cover,state.main,state.facts]))) throw new Error('Overview columns are not aligned: '+mode+' '+JSON.stringify(state));
+        if(width>800&&(state.columns!==3||!aligned([state.main,state.facts]))) throw new Error('Overview text columns are not aligned: '+mode+' '+JSON.stringify(state));
+        if(Math.abs(state.cover.width/state.cover.height-.72)>.01||state.coverObjectFit!=='cover') throw new Error('Original poster proportions or fit changed: '+mode+' '+JSON.stringify(state));
+        if(width>800&&Math.abs(state.edit.top-state.summary.bottom-24)>2) throw new Error('Synopsis must fill space up to the normal edit-button gap: '+mode+' '+JSON.stringify(state));
+        if(['default','right-long'].includes(mode)&&state.summary.height<=248) throw new Error('Synopsis did not grow beyond its former 248px cap: '+mode+' '+JSON.stringify(state));
         if(hasCharacters&&hasStaff&&width>800&&(!aligned([state.characters,state.team])||Math.abs(state.staff.bottom-state.characters.bottom)>2)) throw new Error('Character/team columns are not aligned: '+mode+' '+JSON.stringify(state));
         if(hasStaff&&(state.team.height<100||state.staff.height<70)) throw new Error('Team column collapsed: '+mode+' '+JSON.stringify(state));
         if(hasCharacters&&hasStaff&&width<=800&&state.team.top<state.characters.bottom-2) throw new Error('Narrow team must follow characters: '+JSON.stringify(state));
@@ -101,7 +110,7 @@ try {
         await screenshot(mode+'-scrolled');
       }
       if(errors.length) throw new Error(errors.join('\\n'));
-      console.log('GAME_OVERVIEW_SMOKE_OK: 11 layouts; aligned overview and character/team columns, adaptive 6-character height at wide/narrow widths, short summary, staff-only/characters-only, 760px stacking, long titles, bounded scrolling of all 40 staff, right tags and bilingual view verified. Screenshots: '+${JSON.stringify(artifacts)});
+      console.log('GAME_OVERVIEW_SMOKE_OK: 12 layouts; original poster proportions/fit, aligned text columns with synopsis filling the former blank space, adaptive 6-character/team height at wide/narrow widths, short summary, staff-only/characters-only, 760px stacking, long titles, scrolling of all 40 staff, right tags and bilingual view verified. Screenshots: '+${JSON.stringify(artifacts)});
       window.destroy(); app.exit(0);
     }).catch(error=>{console.error(error);app.exit(1);});
   `);

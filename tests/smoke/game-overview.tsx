@@ -24,7 +24,8 @@ const metadata: GameMetadataSummary = {
   sources: [{
     source: 'vndb', status: 'matched', queryName: game.name, externalId: 'v18852',
     title: mode === 'long-title' ? 'AmatsutsumiAStoryBeyondTheSummer'.repeat(8) : 'Amatsutsumi',
-    titleCn: mode === 'long-title' ? '天津罪 · 言语连接人与人之间的夏日记忆'.repeat(5) : '天津罪', developer: 'Purple software',
+    titleCn: mode === 'long-title' ? '天津罪 · 言语连接人与人之间的夏日记忆'.repeat(5) : '天津罪',
+    developer: mode === 'right-long' ? 'Purple software / Production team and scenario collaboration '.repeat(8) : 'Purple software',
     summary: shortSummary ? '言语将人与人相连，一段值得珍藏的夏日记忆。' : original, summaryZhCn: mode === 'bilingual' ? translated : null,
     releaseDate: '2016-07-29', languages: ['日语', '中文', '英语'], score: 8.4, rank: 120,
     sourceUrl: 'https://vndb.org/v18852', fetchedAt: '2026-10-27T00:00:00.000Z', errorMessage: null,
