@@ -24,8 +24,10 @@ github-release-staging-v*/
 artifacts/reina-ui/
 artifacts/journal-ui/
 artifacts/game-overview-ui/
+artifacts/play-chart-ui/
 .journal-ui-smoke-*/
 .game-overview-smoke-*/
+.play-chart-smoke-*/
 coverage/
 *.log
 *.tsbuildinfo

@@ -124,6 +124,8 @@ describe('renderer shell', () => {
   it('opens saved play records as a sibling view and resets the view when selecting another game', async () => {
     const secondGame = { ...game, id: 'game-2', name: '第二部作品' };
     mockGalMusic([game, secondGame], [track]);
+    const links = vi.fn().mockResolvedValue([]);
+    Object.assign(window.galMusic, { reinaSources: vi.fn().mockResolvedValue([]), reinaLinks: links });
     render(<App />);
 
     fireEvent.click(await screen.findByTestId(`game-item-${game.id}`));
@@ -132,7 +134,8 @@ describe('renderer shell', () => {
     fireEvent.click(records);
     expect(await screen.findByRole('heading', { name: '游玩记录', level: 2 })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '打开游玩记录' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByText(new RegExp(`只读读取 ReinaManager 中《${game.name}》`, 'u'))).toBeInTheDocument();
+    await waitFor(() => expect(links).toHaveBeenCalledWith(game.id));
+    expect(screen.queryByText(/只读读取/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '打开作品资料' }));
     expect(screen.queryByRole('heading', { name: '游玩记录', level: 2 })).not.toBeInTheDocument();
@@ -145,8 +148,7 @@ describe('renderer shell', () => {
     expect(screen.getByRole('button', { name: '打开作品资料' })).toHaveAttribute('aria-current', 'page');
     fireEvent.click(screen.getByRole('button', { name: '打开游玩记录' }));
     expect(await screen.findByRole('heading', { name: '游玩记录', level: 2 })).toBeInTheDocument();
-    expect(screen.getByText(/只读读取 ReinaManager 中《第二部作品》/u)).toBeInTheDocument();
-    expect(screen.queryByText(new RegExp(`只读读取 ReinaManager 中《${game.name}》`, 'u'))).not.toBeInTheDocument();
+    await waitFor(() => expect(links).toHaveBeenLastCalledWith(secondGame.id));
   });
 
   it('keeps track column headers while removing helper copy from the library shell', async () => {
