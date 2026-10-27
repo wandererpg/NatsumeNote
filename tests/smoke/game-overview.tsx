@@ -5,6 +5,10 @@ import type { Game, GameMetadataSummary } from '../../src/shared/types';
 import '../../src/renderer/src/styles/globals.css';
 
 const mode = new URLSearchParams(location.search).get('mode') ?? 'default';
+const shortSummary = mode === 'short';
+const staffOnly = mode === 'staff-only';
+const charactersOnly = mode === 'characters-only';
+const characterCount = staffOnly ? 0 : ['six-characters', 'six-narrow', 'stacked', 'long-title'].includes(mode) ? 6 : 3;
 const game: Game = {
   id: 'overview-demo', name: 'Amatsutsumi · アマツツミ', coverPath: null, coverSource: null,
   folderPath: 'C:/synthetic/Amatsutsumi', trackCount: 38, createdAt: '', updatedAt: '',
@@ -19,17 +23,18 @@ const metadata: GameMetadataSummary = {
   gameId: game.id, coverSource: null,
   sources: [{
     source: 'vndb', status: 'matched', queryName: game.name, externalId: 'v18852',
-    title: 'Amatsutsumi', titleCn: '天津罪', developer: 'Purple software',
-    summary: original, summaryZhCn: mode === 'bilingual' ? translated : null,
+    title: mode === 'long-title' ? 'AmatsutsumiAStoryBeyondTheSummer'.repeat(8) : 'Amatsutsumi',
+    titleCn: mode === 'long-title' ? '天津罪 · 言语连接人与人之间的夏日记忆'.repeat(5) : '天津罪', developer: 'Purple software',
+    summary: shortSummary ? '言语将人与人相连，一段值得珍藏的夏日记忆。' : original, summaryZhCn: mode === 'bilingual' ? translated : null,
     releaseDate: '2016-07-29', languages: ['日语', '中文', '英语'], score: 8.4, rank: 120,
     sourceUrl: 'https://vndb.org/v18852', fetchedAt: '2026-10-27T00:00:00.000Z', errorMessage: null,
     tags: ['言灵', '夏日', '乡村', '超自然', '剧情', '恋爱', '日本', '日常', '成长', '情感', '视觉小说', '多结局', '回忆', '人与人之间的联系'],
-    characters: Array.from({ length: 3 }, (_, index) => ({
-      externalId: `character-${index}`, name: ['织部心', '朝比奈响子', '水无月萤'][index], originalName: null,
+    characters: Array.from({ length: characterCount }, (_, index) => ({
+      externalId: `character-${index}`, name: ['织部心', '朝比奈响子', '水无月萤', '恋冢爱', '织部诚', '水无月苍'][index], originalName: null,
       role: index === 0 ? 'main' : 'side', description: '在这个小镇中相遇的人，各自守护着一段平凡而重要的日常。',
       imageUrl: null, voiceActors: ['演出声优'], sourceUrl: `https://vndb.org/c${index + 1}`,
     })),
-    staff: Array.from({ length: 40 }, (_, index) => ({
+    staff: Array.from({ length: charactersOnly ? 0 : 40 }, (_, index) => ({
       externalId: `staff-${index}`, name: `制作成员 ${String(index + 1).padStart(2, '0')}`, originalName: null,
       role: ['scenario', 'art', 'music', 'director'][index % 4], imageUrl: null,
       sourceUrl: `https://vndb.org/s${index + 1}`,

@@ -27,7 +27,7 @@ try {
         await settle();
         fs.writeFileSync(path.join(${JSON.stringify(artifacts)}, name+'.png'), (await window.webContents.capturePage()).toPNG());
       };
-      const scenarios = [['default',1440,960],['narrow',960,640],['light',1440,960],['bilingual',1440,960]];
+      const scenarios = [['default',1440,960],['narrow',960,640],['light',1440,960],['bilingual',1440,960],['short',1440,960],['six-characters',1440,960],['six-narrow',960,640],['staff-only',1440,960],['characters-only',1440,960],['stacked',760,900],['long-title',1440,960]];
       for (const [mode,width,height] of scenarios) {
         console.log('Overview check: '+mode);
         window.setContentSize(width,height);
@@ -38,44 +38,70 @@ try {
           await settle();
         }
         const state = await evaluate(()=>{
+          const overview=document.querySelector('.game-overview');
+          const cover=document.querySelector('.game-overview__cover');
           const main=document.querySelector('.game-overview__main');
           const facts=document.querySelector('.game-overview__facts');
+          const details=document.querySelector('.game-archive-details');
+          const characters=document.querySelector('.game-archive-details__characters');
+          const team=document.querySelector('.game-archive-details__staff');
           const tags=document.querySelector('[role="group"][aria-label="作品标签"]');
           const summary=document.querySelector('.summary-reader__scroll');
           const staff=document.querySelector('.staff-list');
           const body=document.body.textContent;
+          const bounds=element=>{
+            if(!element)return null;
+            const {top,bottom,left,right,height,width}=element.getBoundingClientRect();
+            return {top,bottom,left,right,height,width};
+          };
+          const columns=getComputedStyle(overview).gridTemplateColumns.split(' ').length;
           return {
             overflow: document.documentElement.scrollWidth>innerWidth,
             tagsRight: facts.contains(tags)&&facts.getBoundingClientRect().left>=main.getBoundingClientRect().right-1,
             summaryScrollable: summary.scrollHeight>summary.clientHeight,
-            staffScrollable: staff.scrollHeight>staff.clientHeight,
-            staffCount: staff.querySelectorAll('li').length,
+            staffScrollable: staff?staff.scrollHeight>staff.clientHeight:false,
+            staffCount: staff?staff.querySelectorAll('li').length:0,
+            characterCount: document.querySelectorAll('.character-card').length,
             oldNotice: body.includes('资料暂时加载失败')||body.includes('已导入的作品和游玩记录仍可使用'),
             sourceMarkup: body.includes('[From')||body.includes('[url=')||body.includes('Sekai Project'),
             records: body.includes('已保存的游玩记录'),
             languageBlocks: summary.querySelectorAll('.summary-reader__text').length,
             theme: document.documentElement.dataset.theme,
+            columns, cover:bounds(cover),main:bounds(main),facts:bounds(facts),details:bounds(details),characters:bounds(characters),team:bounds(team),staff:bounds(staff),
           };
         });
-        if(state.overflow||!state.tagsRight||!state.summaryScrollable||!state.staffScrollable||state.staffCount!==40||state.oldNotice||state.sourceMarkup||state.records||(mode==='bilingual'&&state.languageBlocks!==2)||(mode==='light'&&state.theme!=='aquarium-glass')) {
+        const hasStaff=mode!=='characters-only';
+        const hasCharacters=mode!=='staff-only';
+        const scrollSummary=mode!=='short';
+        const aligned=rectangles=>Math.max(...rectangles.map(rect=>rect.top))-Math.min(...rectangles.map(rect=>rect.top))<=2&&Math.max(...rectangles.map(rect=>rect.bottom))-Math.min(...rectangles.map(rect=>rect.bottom))<=2;
+        if(state.overflow||!state.tagsRight||state.summaryScrollable!==scrollSummary||state.staffScrollable!==hasStaff||state.staffCount!==(hasStaff?40:0)||state.oldNotice||state.sourceMarkup||state.records||(mode==='bilingual'&&state.languageBlocks!==2)||(mode==='light'&&state.theme!=='aquarium-glass')) {
           throw new Error('Overview layout/state failed: '+mode+' '+JSON.stringify(state));
         }
+        if(width>800&&(state.columns!==3||!aligned([state.cover,state.main,state.facts]))) throw new Error('Overview columns are not aligned: '+mode+' '+JSON.stringify(state));
+        if(hasCharacters&&hasStaff&&width>800&&(!aligned([state.characters,state.team])||Math.abs(state.staff.bottom-state.characters.bottom)>2)) throw new Error('Character/team columns are not aligned: '+mode+' '+JSON.stringify(state));
+        if(hasStaff&&(state.team.height<100||state.staff.height<70)) throw new Error('Team column collapsed: '+mode+' '+JSON.stringify(state));
+        if(hasCharacters&&hasStaff&&width<=800&&state.team.top<state.characters.bottom-2) throw new Error('Narrow team must follow characters: '+JSON.stringify(state));
+        if(!hasCharacters||!hasStaff) {
+          const only=state.characters||state.team;
+          if(Math.abs(only.left-state.details.left)>2||Math.abs(only.right-state.details.right)>2) throw new Error('Single detail column must fill available width: '+mode+' '+JSON.stringify(state));
+        }
+        if(['six-characters','six-narrow','stacked','long-title'].includes(mode)&&state.characterCount!==6) throw new Error('Six-character fixture missing');
         await screenshot(mode);
         const scroll = await evaluate(()=>{
           const summary=document.querySelector('.summary-reader__scroll');
           const staff=document.querySelector('.staff-list');
           summary.scrollTop=summary.scrollHeight;
-          staff.scrollTop=staff.scrollHeight;
-          const last=staff.lastElementChild.getBoundingClientRect();
-          const bounds=staff.getBoundingClientRect();
-          return { summary:summary.scrollTop, staff:staff.scrollTop, lastVisible:last.top>=bounds.top-1&&last.bottom<=bounds.bottom+1 };
+          if(staff)staff.scrollTop=staff.scrollHeight;
+          const last=staff?.lastElementChild.getBoundingClientRect();
+          const bounds=staff?.getBoundingClientRect();
+          return { summary:summary.scrollTop, staff:staff?.scrollTop??0, lastVisible:!staff||(last.top>=bounds.top-1&&last.bottom<=bounds.bottom+1) };
         });
-        if(scroll.summary<=0||scroll.staff<=0||!scroll.lastVisible) throw new Error('Inner scrolling failed: '+mode+' '+JSON.stringify(scroll));
+        if((scrollSummary&&scroll.summary<=0)||(hasStaff&&scroll.staff<=0)||!scroll.lastVisible) throw new Error('Inner scrolling failed: '+mode+' '+JSON.stringify(scroll));
         await evaluate(()=>document.querySelector('.game-archive-details').scrollIntoView({block:'end'}));
         await screenshot(mode+'-scrolled');
       }
       if(errors.length) throw new Error(errors.join('\\n'));
-      console.log('GAME_OVERVIEW_SMOKE_OK: 4 layouts; readable bounded summary/staff scrolling, all 40 staff, right tags, clean prose, separate records and bilingual view verified. Screenshots: '+${JSON.stringify(artifacts)});
+      console.log('GAME_OVERVIEW_SMOKE_OK: 11 layouts; aligned overview and character/team columns, adaptive 6-character height at wide/narrow widths, short summary, staff-only/characters-only, 760px stacking, long titles, bounded scrolling of all 40 staff, right tags and bilingual view verified. Screenshots: '+${JSON.stringify(artifacts)});
       window.destroy(); app.exit(0);
     }).catch(error=>{console.error(error);app.exit(1);});
   `);
