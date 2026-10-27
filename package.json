@@ -12,7 +12,6 @@
     "postinstall": "npm run rebuild:native",
     "predev": "npm run rebuild:native",
     "dev": "electron-vite dev",
-    "dev:web": "vite --config vite.web.config.ts",
     "build": "electron-vite build",
     "test": "node scripts/run-vitest-electron.mjs",
     "test:watch": "vitest",
