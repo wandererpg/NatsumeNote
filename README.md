@@ -2,56 +2,28 @@
 
 NatsumeNote 是一款面向 Windows 的 Galgame 音乐播放器与作品手账。选择游戏目录后，它可以递归扫描普通音频和常见资源包，把音乐复制到独立音乐库，并自动抓取作品资料；每部作品还拥有独立的分页白板，可自由摆放便签、图片、视频、引用和曲目卡。
 
-当前版本：`v_1.2`（内部版本 `1.2.0`） · Windows Electron
+当前版本：`v_1.2`（内部版本 `1.2.0`） · Windows x64 · Electron
 
 源码仓库：[github.com/wandererpg/NatsumeNote](https://github.com/wandererpg/NatsumeNote)
 
-## v_1.2 最新打包版（2026-10-28）
+## v_1.2 更新内容
 
-按本次命名要求，将下述全部界面改进重新打包为 `v_1.2`（`1.2.0`）。最新 Windows x64 安装程序为 `release-v_1.2-update/NatsumeNote-1.2.0-x64.exe`；运行后可选择安装目录，安装后的标题栏显示 `v_1.2`，沿用现有作品、音乐和手账数据。原 `win-unpacked/` 应用与旧的 `release-v_1.2/` 保留。同目录的安装版 ZIP、便携版 ZIP 和 `SHA256SUMS.txt` 均已同步更新，压缩包包含本次全部改进。
+- 美化手账页面导航、工具栏、属性面板与卡片排版，优化过渡动画、键盘操作和编辑保存。
+- 作品简介随右栏自适应延长，封面保持原有显示方式；人物资料与主创团队上下对齐，超出内容在栏内滚动，标签位于右栏。
+- 游玩记录与作品资料同级，顶部保留来源总计和每日时长折线图，支持悬停与方向键查看，完整读取已保存历史，精简冗长提示。
 
-安装版 ZIP 解压后运行其中的安装 EXE；便携版 ZIP 解压后保留完整目录，直接运行其中的 `NatsumeNote.exe`。
-
-更新包括手账界面与动画、简介随右栏自适应延长（封面维持原样）、人物与主创团队对齐，以及独立的游玩记录页和每日时长折线图。详见 [v_1.2 更新说明](docs/releases/1.2.0.md)。源码开发使用 `npm run dev`。
-
-## v_1.3 原地更新记录（2026-10-27）
-
-本次直接更新已有的 `release-v_1.2-update/win-unpacked/` 应用。运行其中的 `NatsumeNote.exe`，标题栏显示 `v_1.3`，沿用原应用的作品、音乐和手账数据。没有另建示例应用、版本目录或安装包。源码开发使用 `npm run dev`，通过 Electron + Vite 打开同一套桌面界面。
-
-- 作品资料首块的简介区域随右栏高度自适应延长，底部操作对齐，封面维持原有显示方式；人物资料与主创团队上下对齐，名单高度随左栏变化，超出部分在栏内滚动；标签位于右栏。
-- 游玩记录与作品资料同级，顶部只保留来源总计与每日游玩时长折线图，作品关联和数据来源移到下方。
-- 图表完整读取历史，按日期合并游玩时长，支持悬停与方向键查看；移除时间范围、会话累计和说明小字。
-- 沿用手账的界面与动画改进。
-
-详见 [v_1.3 更新说明](docs/releases/1.3.0.md)。本次只原地更新上述应用目录；下方保留的安装包、压缩包及 `release-v_1.2/` 仍属于 v_1.2。
-
-## v_1.2 更新重点（2026-10-27）
-
-本版在 v_1.1 基础上更新作品手账界面与交互，沿用现有应用标识、数据目录和 schema 9。
-
-- **手账工作台**：清楚的页签、横向插入工具栏、可收起的属性面板，以及更易阅读的纸面和卡片排版，适配全部七套主题。
-- **操作与动效**：复用 Anime.js 加入页面、卡片和属性面板过渡；支持减少动态效果、键盘切页与移动、拖动取消和整页适配。
-- **编辑保存**：保存期间继续输入会顺序写入；快速离开会补存，写入失败的草稿在应用运行期间可恢复并重试。
-- **作品隔离**：避免延迟返回的创建、素材导入或删除结果影响其他作品；创建新页期间继续输入会先保存再切页。
-- **档案与游玩记录**：作品简介、主创名单改为局部滚动，标签移至右栏；清理简介来源尾注，把游玩记录移到与作品资料同级的独立栏目。
-
-本地直接打开 `release-v_1.2/win-unpacked/NatsumeNote.exe`；也可运行 `release-v_1.2/NatsumeNote-1.2.0-x64.exe` 安装。旧版目录和旧快捷方式仍指向旧版本。
-
-2026-10-27 的档案布局调整版位于 `release-v_1.2-update/`，直接运行其中 `win-unpacked/NatsumeNote.exe` 即可；原 `release-v_1.2/` 保留。
-
-详见 [完整更新说明](docs/releases/1.2.0.md)、[ReinaManager 连接说明](docs/reina-mcp-guide.md)和[双向同步操作说明](docs/library-sync-guide.md)。本地新安装包与旧的 0.1.0 产物分目录保存；公开 Release 状态以 GitHub 页面为准。
+详见 [完整更新说明](docs/releases/1.2.0.md)。安装版和便携版均为 `1.2.0`，已通过归档、原生组件及隔离界面检查。公开下载状态以 [GitHub Releases](https://github.com/wandererpg/NatsumeNote/releases) 为准。
 
 ## 下载与安装
 
-GitHub Release 建议上传下面两个压缩包和校验文件：
+安装版和便携版压缩包分别用于安装和直接运行。校验值见同一发布中的 `SHA256SUMS.txt`。
 
 | 文件 | 用途 |
 | --- | --- |
 | `NatsumeNote-1.2.0-windows-x64-installer.zip` | 安装版。解压后运行 `NatsumeNote-1.2.0-installer/NatsumeNote-1.2.0-x64.exe`，可以选择安装目录，并创建桌面/开始菜单快捷方式。 |
 | `NatsumeNote-1.2.0-windows-x64-portable.zip` | 便携版。解压后直接运行 `NatsumeNote-1.2.0-portable/NatsumeNote.exe`，不会执行安装流程。 |
-| `SHA256SUMS.txt` | 安装程序、两个 ZIP 和更新文件的 SHA-256 校验值。 |
 
-便携版不能只拿出一个 `NatsumeNote.exe` 使用，必须保留旁边的 `resources` 文件夹。安装版和便携版使用同一套应用数据；更新前请先关闭正在运行的旧版 NatsumeNote。
+请完整解压便携版并保留旁边的 `resources`、DLL 和 `locales` 文件；不要只复制一个 EXE。更新前请先关闭旧版，原有作品、音乐和手账数据继续沿用。
 
 ## 功能
 
@@ -111,64 +83,6 @@ GitHub Release 建议上传下面两个压缩包和校验文件：
 - 手账页面和卡片数据位于 SQLite；导入的图片/视频位于每部作品目录下的 `手账/素材`，页面中的曲目卡只引用现有曲目 ID。
 - 备份时请同时备份数据库文件和整个音乐库目录。只备份数据库会留下没有对应音频或手账素材的记录，单独备份音乐文件也会丢失收藏、播放列表、封面和手账页面。
 
-## 常见问题
-
-### 设置里看不到主题
-
-请确认运行的是当前版本的 `NatsumeNote.exe` 或安装版，而不是旧的 `GalMusic.lnk`/`NatsumeMusic.lnk`。旧快捷方式可能仍然指向旧安装目录；重新运行安装版或直接打开便携版目录中的 `NatsumeNote.exe` 即可。
-
-### 导入游戏后没有找到音乐
-
-请选择游戏根目录而不是某一个内部文件，并开启深度扫描。对于无扩展名资源，软件只会把文件头为 `SM2MPX10` 且容器名为 `WMSC` 的内容识别为音乐；`VOICE*` 需要打开包含语音选项。GARbro 诊断日志位于用户数据目录的 `logs/garbro.log`。
-
-### 如何打开音乐库文件夹
-
-进入“作品音乐”后，点击标题栏右上角的文件夹按钮；也可以点击具体曲目右侧的文件夹按钮。应用会打开资源管理器并定位曲目文件，不会启动系统媒体播放器。默认音乐库位置为 `C:\Users\<用户名>\Music\NatsumeNote`；如果修改过位置，以“设置 → 音乐库位置”显示的路径为准。
-
-### 没有自动封面
-
-先检查导入完成页中的 VNDB/Bangumi 状态。候选不明确、无结果、网络失败和封面下载失败都不会影响播放；打开游戏编辑器后点击“刷新网络资料”，也可以直接选择本地封面。
-
-### 便携版无法启动或提示缺少文件
-
-请重新完整解压 ZIP，不要只复制 `NatsumeNote.exe`。`resources` 文件夹必须与可执行文件保持相邻，且不要从压缩包内直接运行。
-
-## 开发与自行打包
-
-环境要求：Node.js 20 或 22 LTS、Windows x64，以及可正常运行的 npm。当前 `better-sqlite3` 版本不建议配合 Node.js 24 安装依赖。
-
-```powershell
-npm install
-npm run dev
-```
-
-`npm run dev` 会先检查 Electron 能否实际加载 `better-sqlite3`；只有缺失或 ABI 不匹配时才安装对应的官方预编译文件，不要求每次启动都安装 Visual Studio。若预编译下载因证书或网络失败，可先运行 `npm run rebuild:native` 重试。只有明确要从源码编译时，才需要安装 Python 与 Visual Studio 的“使用 C++ 的桌面开发”工作负载，然后运行 `npm run rebuild:native:source`。
-
-验证代码、资源和生产构建：
-
-```powershell
-npm test -- --run
-npx tsc --noEmit
-npm run verify:resources
-npm run build
-```
-
-生成 Windows x64 NSIS 安装包：
-
-```powershell
-npm run package:win
-```
-
-命令完成后，NSIS 安装程序位于 `release/NatsumeNote-1.2.0-x64.exe`。本次 v_1.2 使用独立目录，保留旧构建：
-
-```powershell
-npm run package:win -- --config.directories.output=release-v_1.2 --publish never
-node scripts/smoke-reina.mjs release-v_1.2
-node scripts/verify-release.mjs release-v_1.2
-```
-
-验证脚本核对打包代码、更新文件和原生 SQLite，生成并校验安装版 ZIP、便携版 ZIP 与 `SHA256SUMS.txt`；为避免混入旧文件，拒绝覆盖已有 ZIP。接口检查使用临时合成数据，不操作用户数据库。自行压缩便携版时必须保留整个 `win-unpacked/` 目录，包括 DLL、`locales/` 和 `resources/`。
-
 产物目录结构如下（便携版还包含其他运行文件）：
 
 ```text
@@ -185,11 +99,6 @@ NatsumeNote-1.2.0-windows-x64-portable.zip
 SHA256SUMS.txt
 ```
 
-PowerShell 生成校验值：
-
-```powershell
-Get-FileHash .\NatsumeNote-1.2.0-windows-x64-*.zip -Algorithm SHA256
-```
 
 深度扫描依赖 `resources/tools/garbro/` 下的 GARbro 文件。发布包已经携带这套运行时资源；从源码自行打包前，请先确认资源校验通过，并确认 GARbro 及其依赖允许以你的发布方式再分发。
 
