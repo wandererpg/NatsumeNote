@@ -4,6 +4,7 @@ import path from 'node:path';
 import electron from 'electron';
 
 const root = process.cwd();
+const expectedVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 const archive = path.resolve(process.argv[2] ?? 'release-v_1.2-update/win-unpacked/resources/app.asar');
 if (!fs.statSync(archive).isFile()) throw new Error('Expected an existing app.asar.');
 const folder = fs.mkdtempSync(path.join(root, '.unpacked-ui-smoke-'));
@@ -22,6 +23,9 @@ async function harness() {
   const archive = process.env.NATSUME_SMOKE_ARCHIVE;
   const root = process.env.NATSUME_SMOKE_WORKSPACE;
   const artifacts = process.env.NATSUME_SMOKE_ARTIFACTS;
+  const expectedVersion = process.env.NATSUME_SMOKE_VERSION;
+  if (!expectedVersion) throw new Error('Expected workspace version is missing.');
+  const displayVersion = 'v_' + expectedVersion.split('.').slice(0, 2).join('.');
   const userData = path.join(__dirname, 'user-data');
   const music = path.join(__dirname, 'music');
   for (const directory of [userData, music, path.join(music, 'NatsumeNote')]) fs.mkdirSync(directory, { recursive: true });
@@ -31,7 +35,7 @@ async function harness() {
   app.commandLine.appendSwitch('force-device-scale-factor', '1');
   if (app.isPackaged) throw new Error('Smoke runtime must disable packaged update checks.');
   const packaged = require(path.join(archive, 'package.json'));
-  if (packaged.version !== '1.3.0') throw new Error('Archive version is ' + packaged.version);
+  if (packaged.version !== expectedVersion) throw new Error('Archive version is ' + packaged.version + '; expected ' + expectedVersion);
   const Database = require(path.join(archive, 'node_modules/better-sqlite3'));
   const gameId = randomUUID();
   const emptyId = randomUUID();
@@ -96,9 +100,9 @@ async function harness() {
   const pause = () => new Promise(resolve => setTimeout(resolve, 150));
   for (let attempt = 0; !mainWindow && attempt < 100; attempt++) await pause();
   if (!mainWindow) throw new Error('Archived main did not create a window.');
-  const evaluate = fn => mainWindow.webContents.executeJavaScript('(' + fn.toString() + ')()');
-  const waitFor = async (fn, label) => {
-    for (let attempt = 0; attempt < 100; attempt++) { if (await evaluate(fn)) return; await pause(); }
+  const evaluate = (fn, ...args) => mainWindow.webContents.executeJavaScript('(' + fn.toString() + ')(...' + JSON.stringify(args) + ')');
+  const waitFor = async (fn, label, ...args) => {
+    for (let attempt = 0; attempt < 100; attempt++) { if (await evaluate(fn, ...args)) return; await pause(); }
     throw new Error(label + ': ' + await evaluate(() => document.body.textContent));
   };
   const screenshot = async name => { await pause(); fs.writeFileSync(path.join(artifacts, name + '.png'), (await mainWindow.webContents.capturePage()).toPNG()); };
@@ -111,7 +115,7 @@ async function harness() {
     await mainWindow.webContents.executeJavaScript(`document.querySelector('[data-testid="game-item-${id}"]').click()`);
     await waitFor(() => Boolean(document.querySelector('.game-overview')), 'Overview did not open');
   };
-  await waitFor(() => document.body.textContent.includes('v_1.3') && typeof window.galMusic?.reinaQuery === 'function', 'Actual preload or version badge missing');
+  await waitFor(version => document.querySelector('.brand-lockup__version')?.textContent === version && typeof window.galMusic?.reinaQuery === 'function', 'Actual preload or version badge missing', displayVersion);
   const bridge = await evaluate(() => ({ frozen: Object.isFrozen(window.galMusic), createPage: typeof window.galMusic.createJournalPage, savePage: typeof window.galMusic.saveJournalPage }));
   if (!bridge.frozen || bridge.createPage !== 'function' || bridge.savePage !== 'function') throw new Error('Expected the actual context-isolated preload bridge: ' + JSON.stringify(bridge));
   await waitFor(() => document.querySelectorAll('[data-testid^="game-item-"]').length === 2, 'Synthetic library did not load');
@@ -148,18 +152,18 @@ async function harness() {
   // Creating a text page through IPC keeps validation, authorization and the
   // actual SQLite journal implementation in the acceptance path.
   const pageId = randomUUID();
-  await mainWindow.webContents.executeJavaScript(`window.galMusic.createJournalPage({id:${JSON.stringify(pageId)},gameId:${JSON.stringify(gameId)},title:'v_1.3 真实保存验收',canvasWidth:1200,canvasHeight:900,blocks:[{id:${JSON.stringify(randomUUID())},type:'text',x:80,y:100,width:420,height:220,rotation:0,zIndex:1,locked:false,text:'待保存',color:'#f3f7f5',backgroundColor:'#20383a',fontSize:24,align:'left'}]})`);
+  await mainWindow.webContents.executeJavaScript(`window.galMusic.createJournalPage({id:${JSON.stringify(pageId)},gameId:${JSON.stringify(gameId)},title:'手账真实保存验收',canvasWidth:1200,canvasHeight:900,blocks:[{id:${JSON.stringify(randomUUID())},type:'text',x:80,y:100,width:420,height:220,rotation:0,zIndex:1,locked:false,text:'待保存',color:'#f3f7f5',backgroundColor:'#20383a',fontSize:24,align:'left'}]})`);
   await click('打开作品资料');
   await click('打开手账空间');
-  await waitFor(() => [...document.querySelectorAll('button')].some(button => button.textContent.includes('v_1.3 真实保存验收')), 'Created page missing');
-  await evaluate(() => [...document.querySelectorAll('button')].find(button => button.textContent.includes('v_1.3 真实保存验收')).click());
+  await waitFor(() => [...document.querySelectorAll('button')].some(button => button.textContent.includes('手账真实保存验收')), 'Created page missing');
+  await evaluate(() => [...document.querySelectorAll('button')].find(button => button.textContent.includes('手账真实保存验收')).click());
   await waitFor(() => Boolean(document.querySelector('textarea[aria-label="手账文字"]')), 'Real journal text editor missing');
-  await evaluate(() => { const input = document.querySelector('textarea[aria-label="手账文字"]'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, 'v_1.3：真实 IPC 已保存。'); input.dispatchEvent(new Event('input', { bubbles: true })); });
+  await evaluate(() => { const input = document.querySelector('textarea[aria-label="手账文字"]'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, '真实 IPC 已保存。'); input.dispatchEvent(new Event('input', { bubbles: true })); });
   await pause();
   await evaluate(() => [...document.querySelectorAll('.journal-workspace__actions button')].find(button => button.textContent.trim() === '保存').click());
   await waitFor(() => document.querySelector('.journal-save-status')?.textContent.includes('已保存'), 'UI journal save did not finish');
   const stored = await mainWindow.webContents.executeJavaScript(`window.galMusic.getJournalPages(${JSON.stringify(gameId)})`);
-  if (!stored.find(page => page.id === pageId)?.blocks.some(block => block.type === 'text' && block.text === 'v_1.3：真实 IPC 已保存。')) throw new Error('Journal UI edit did not persist through IPC');
+  if (!stored.find(page => page.id === pageId)?.blocks.some(block => block.type === 'text' && block.text === '真实 IPC 已保存。')) throw new Error('Journal UI edit did not persist through IPC');
   await screenshot('journal');
   mainWindow.setContentSize(960, 640);
   await pause();
@@ -189,20 +193,20 @@ async function harness() {
   const savedDb = new Database(path.join(userData, 'galmusic.db'), { readonly: true });
   const row = savedDb.prepare('SELECT blocks_json FROM journal_pages WHERE id=?').get(pageId);
   savedDb.close();
-  if (!row?.blocks_json.includes('v_1.3：真实 IPC 已保存。')) throw new Error('Private SQLite row does not contain journal edit');
+  if (!row?.blocks_json.includes('真实 IPC 已保存。')) throw new Error('Private SQLite row does not contain journal edit');
   if (!fs.readFileSync(sourcePath).equals(initialSourceBytes)) throw new Error('Synthetic read-only Reina source changed');
   if (errors.length) throw new Error('Renderer errors: ' + errors.join('\n'));
   if (externalRequests.length) throw new Error('Unexpected external requests: ' + externalRequests.join(', '));
   if (mainWindow.isVisible()) throw new Error('Acceptance must keep the real app window hidden');
-  console.log('UNPACKED_UI_SMOKE_OK: app.asar v1.3.0, archived main/preload/renderer, actual frozen IPC, scrolling archive, real Reina utility reader/103-session daily chart, empty chart, actual journal SQLite save, 960px layout, no network or visible window. Screenshots: ' + artifacts);
+  console.log('UNPACKED_UI_SMOKE_OK: app.asar ' + displayVersion + ' (' + expectedVersion + '), archived main/preload/renderer, actual frozen IPC, scrolling archive, real Reina utility reader/103-session daily chart, empty chart, actual journal SQLite save, 960px layout, no network or visible window. Screenshots: ' + artifacts);
   mainWindow.destroy();
   app.quit();
 }
 
 try {
-  fs.writeFileSync(path.join(folder, 'package.json'), JSON.stringify({ name: 'natsume-note-isolated-ui-acceptance', version: '1.3.0', main: 'main.cjs' }));
+  fs.writeFileSync(path.join(folder, 'package.json'), JSON.stringify({ name: 'natsume-note-isolated-ui-acceptance', version: expectedVersion, main: 'main.cjs' }));
   fs.writeFileSync(path.join(folder, 'main.cjs'), `(${harness.toString()})().catch(error => { console.error(error); require('electron').app.exit(1); });`);
-  const env = { ...process.env, NATSUME_SMOKE_ARCHIVE: archive, NATSUME_SMOKE_WORKSPACE: root, NATSUME_SMOKE_ARTIFACTS: artifacts };
+  const env = { ...process.env, NATSUME_SMOKE_ARCHIVE: archive, NATSUME_SMOKE_WORKSPACE: root, NATSUME_SMOKE_ARTIFACTS: artifacts, NATSUME_SMOKE_VERSION: expectedVersion };
   delete env.ELECTRON_RUN_AS_NODE;
   delete env.ELECTRON_RENDERER_URL;
   process.exitCode = await new Promise((resolve, reject) => {

@@ -1,4 +1,4 @@
-// Verify local Windows release files and prepare the complete portable ZIP.
+// Verify local Windows release files; --exe-only skips the optional ZIPs.
 // No installation or publication is performed.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -13,7 +13,8 @@ const yaml = require('js-yaml');
 const path7za = await require('builder-util/out/7za').getPath7za();
 const root = process.cwd();
 const pkg = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
-const output = path.resolve(process.argv[2] ?? `release-v${pkg.version}`);
+const output = path.resolve(process.argv.slice(2).find(argument => argument !== '--exe-only') ?? `release-v${pkg.version}`);
+const exeOnly = process.argv.includes('--exe-only');
 const unpacked = path.join(output, 'win-unpacked');
 const archive = path.join(unpacked, 'resources', 'app.asar');
 const bundled = JSON.parse(asar.extractFile(archive, 'package.json').toString());
@@ -63,7 +64,7 @@ assert.deepEqual(native, { value: 'native sqlite ok', integrity: 'ok' });
 
 const portableName = `NatsumeNote-${pkg.version}-windows-x64-portable.zip`;
 const installerZipName = `NatsumeNote-${pkg.version}-windows-x64-installer.zip`;
-const zipSpecs = [
+const zipSpecs = exeOnly ? [] : [
   { name: portableName, folder: `NatsumeNote-${pkg.version}-portable`, source: unpacked },
   { name: installerZipName, folder: `NatsumeNote-${pkg.version}-installer`, source: path.join(output,installerName) },
 ];
@@ -89,13 +90,13 @@ try {
   assert.ok(path.basename(staging).startsWith('.zip-staging-'));
   await fs.rm(staging,{recursive:true,force:true,maxRetries:5,retryDelay:100});
 }
-const names = [installerName, `${installerName}.blockmap`, 'latest.yml', installerZipName, portableName];
+const names = [installerName, `${installerName}.blockmap`, 'latest.yml', ...zipSpecs.map(spec => spec.name)];
 const sums = [];
 for (const name of names) {
   const hash = createHash('sha256').update(await fs.readFile(path.join(output, name))).digest('hex');
   sums.push(`${hash}  ${name}`);
 }
 await fs.writeFile(path.join(output, 'SHA256SUMS.txt'), sums.join('\n') + '\n');
-const report = { version: pkg.version, bundledCodeMatches: true, provider: feed.provider, owner: feed.owner, repo: feed.repo, installerMetadataMatches: true, native, portableIntegrity: 'ok', installerZipIntegrity: 'ok', artifacts: names };
+const report = { version: pkg.version, bundledCodeMatches: true, provider: feed.provider, owner: feed.owner, repo: feed.repo, installerMetadataMatches: true, native, portableIntegrity: exeOnly ? 'not-generated' : 'ok', installerZipIntegrity: exeOnly ? 'not-generated' : 'ok', artifacts: names };
 await fs.writeFile(path.join(output, 'verification.json'), JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify(report, null, 2));

@@ -2,11 +2,17 @@
 
 NatsumeNote 是一款面向 Windows 的 Galgame 音乐播放器与作品手账。选择游戏目录后，它可以递归扫描普通音频和常见资源包，把音乐复制到独立音乐库，并自动抓取作品资料；每部作品还拥有独立的分页白板，可自由摆放便签、图片、视频、引用和曲目卡。
 
-当前版本：`v_1.3`（内部版本 `1.3.0`） · Windows Electron
+当前版本：`v_1.2`（内部版本 `1.2.0`） · Windows Electron
 
 源码仓库：[github.com/wandererpg/NatsumeNote](https://github.com/wandererpg/NatsumeNote)
 
-## v_1.3 原地更新（2026-10-27）
+## v_1.2 最新安装包（2026-10-28）
+
+按本次命名要求，将下述全部界面改进重新打包为 `v_1.2`（`1.2.0`）。最新 Windows x64 安装程序为 `release-v_1.2-update/NatsumeNote-1.2.0-x64.exe`；运行后可选择安装目录，安装后的标题栏显示 `v_1.2`，沿用现有作品、音乐和手账数据。原 `win-unpacked/` 应用与旧的 `release-v_1.2/` 保留。此次仅生成并核对本地安装程序，目录内旧 ZIP 不包含这次更新。
+
+更新包括手账界面与动画、简介随右栏自适应延长（封面维持原样）、人物与主创团队对齐，以及独立的游玩记录页和每日时长折线图。详见 [v_1.2 更新说明](docs/releases/1.2.0.md)。源码开发使用 `npm run dev`。
+
+## v_1.3 原地更新记录（2026-10-27）
 
 本次直接更新已有的 `release-v_1.2-update/win-unpacked/` 应用。运行其中的 `NatsumeNote.exe`，标题栏显示 `v_1.3`，沿用原应用的作品、音乐和手账数据。没有另建示例应用、版本目录或安装包。源码开发使用 `npm run dev`，通过 Electron + Vite 打开同一套桌面界面。
 
