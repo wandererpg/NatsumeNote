@@ -6,9 +6,11 @@ NatsumeNote 是一款面向 Windows 的 Galgame 音乐播放器与作品手账�
 
 源码仓库：[github.com/wandererpg/NatsumeNote](https://github.com/wandererpg/NatsumeNote)
 
-## v_1.2 最新安装包（2026-10-28）
+## v_1.2 最新打包版（2026-10-28）
 
-按本次命名要求，将下述全部界面改进重新打包为 `v_1.2`（`1.2.0`）。最新 Windows x64 安装程序为 `release-v_1.2-update/NatsumeNote-1.2.0-x64.exe`；运行后可选择安装目录，安装后的标题栏显示 `v_1.2`，沿用现有作品、音乐和手账数据。原 `win-unpacked/` 应用与旧的 `release-v_1.2/` 保留。此次仅生成并核对本地安装程序，目录内旧 ZIP 不包含这次更新。
+按本次命名要求，将下述全部界面改进重新打包为 `v_1.2`（`1.2.0`）。最新 Windows x64 安装程序为 `release-v_1.2-update/NatsumeNote-1.2.0-x64.exe`；运行后可选择安装目录，安装后的标题栏显示 `v_1.2`，沿用现有作品、音乐和手账数据。原 `win-unpacked/` 应用与旧的 `release-v_1.2/` 保留。同目录的安装版 ZIP、便携版 ZIP 和 `SHA256SUMS.txt` 均已同步更新，压缩包包含本次全部改进。
+
+安装版 ZIP 解压后运行其中的安装 EXE；便携版 ZIP 解压后保留完整目录，直接运行其中的 `NatsumeNote.exe`。
 
 更新包括手账界面与动画、简介随右栏自适应延长（封面维持原样）、人物与主创团队对齐，以及独立的游玩记录页和每日时长折线图。详见 [v_1.2 更新说明](docs/releases/1.2.0.md)。源码开发使用 `npm run dev`。
 
