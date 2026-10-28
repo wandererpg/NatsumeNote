@@ -10,6 +10,8 @@ export interface ReinaSessionsQuery {
   from?: string;
   to?: string;
   pageSize?: number;
+  /** Read every page before publishing history, for complete daily charts. */
+  loadAll?: boolean;
   enabled?: boolean;
 }
 
@@ -55,11 +57,10 @@ function emptyState(): ReinaSessionsState {
 }
 
 /**
- * Loads `reina_get_stats` and the first page of `reina_list_sessions` from the
- * same snapshot. A refresh intentionally drops the old snapshot id so the main
- * process creates a new one; the previous content stays visible and is marked
- * stale until the new snapshot arrives. Old responses are discarded by a
- * per-instance generation counter.
+ * Loads stats and saved sessions from the same snapshot. With loadAll, every
+ * page is collected before publishing history. Refreshes create a new snapshot
+ * and preserve the previous complete history until all new pages arrive.
+ * A generation counter discards responses belonging to an older request.
  */
 export function useReinaSessions({
   sourceId,
@@ -67,6 +68,7 @@ export function useReinaSessions({
   from,
   to,
   pageSize = DEFAULT_PAGE_SIZE,
+  loadAll = false,
   enabled = true,
 }: ReinaSessionsQuery): ReinaSessionsResult {
   const [state, setState] = useState<ReinaSessionsState>(emptyState);
@@ -125,8 +127,11 @@ export function useReinaSessions({
 
         const stats = asReinaStats(statsEnvelope.data);
         const snapshotId = statsEnvelope.snapshotId ? statsEnvelope.snapshotId : null;
+        if (loadAll && !snapshotId) {
+          throw new Error('游玩记录快照不可用，请刷新重试。');
+        }
 
-        const sessionsEnvelope = await bridge.reinaQuery<ReinaSession[]>('reina_list_sessions', {
+        let sessionsEnvelope = await bridge.reinaQuery<ReinaSession[]>('reina_list_sessions', {
           sourceId,
           gameId,
           limit: pageSize,
@@ -135,13 +140,43 @@ export function useReinaSessions({
         });
         if (!isCurrent()) return;
 
+        let sessions = asReinaList<ReinaSession>(sessionsEnvelope.data, 'sessions');
+        let warnings = mergeWarnings(statsEnvelope.warnings, sessionsEnvelope.warnings);
+        let fetchedAt = sessionsEnvelope.fetchedAt || statsEnvelope.fetchedAt || null;
+        let nextCursor = sessionsEnvelope.nextCursor ?? null;
+        const cursors = new Set<string>();
+        if (loadAll && sessionsEnvelope.snapshotId !== snapshotId) {
+          throw new Error('游玩记录快照已变化，请刷新重试。');
+        }
+        while (loadAll && nextCursor) {
+          if (cursors.has(nextCursor)) {
+            throw new Error('游玩记录分页已失效，请刷新重试。');
+          }
+          cursors.add(nextCursor);
+          sessionsEnvelope = await bridge.reinaQuery<ReinaSession[]>('reina_list_sessions', {
+            sourceId,
+            gameId,
+            limit: pageSize,
+            ...range,
+            snapshotId: snapshotId!,
+            cursor: nextCursor,
+          });
+          if (!isCurrent()) return;
+          if (sessionsEnvelope.snapshotId !== snapshotId) {
+            throw new Error('游玩记录快照已变化，请刷新重试。');
+          }
+          sessions = mergeSessions(sessions, asReinaList<ReinaSession>(sessionsEnvelope.data, 'sessions'));
+          warnings = mergeWarnings(warnings, sessionsEnvelope.warnings);
+          fetchedAt = sessionsEnvelope.fetchedAt || fetchedAt;
+          nextCursor = sessionsEnvelope.nextCursor ?? null;
+        }
         setState({
           stats,
-          sessions: asReinaList<ReinaSession>(sessionsEnvelope.data, 'sessions'),
-          warnings: mergeWarnings(statsEnvelope.warnings, sessionsEnvelope.warnings),
-          fetchedAt: sessionsEnvelope.fetchedAt || statsEnvelope.fetchedAt || null,
+          sessions,
+          warnings,
+          fetchedAt,
           snapshotId: sessionsEnvelope.snapshotId || snapshotId,
-          nextCursor: sessionsEnvelope.nextCursor ?? null,
+          nextCursor,
           loading: false,
           refreshing: false,
           loadingMore: false,
@@ -171,7 +206,7 @@ export function useReinaSessions({
         });
       }
     },
-    [enabled, sourceId, gameId, from, to, pageSize],
+    [enabled, sourceId, gameId, from, to, pageSize, loadAll],
   );
 
   useEffect(() => {

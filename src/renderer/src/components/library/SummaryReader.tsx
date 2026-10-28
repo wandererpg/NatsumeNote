@@ -10,12 +10,24 @@ export interface SummaryReaderProps {
   onTranslate?: () => Promise<string>;
 }
 
+/** Keep cached metadata intact; render BBCode as plain text rather than HTML. */
+function summaryDisplayText(summary: string): string {
+  return summary
+    .replace(/(?:^|\r?\n)[ \t]*\[\s*from\s+\[url(?:\s*=\s*[^\]\r\n]*)?\](?:(?!\[\/url\])[^\r\n])*\[\/url\][ \t]*\][ \t]*(?:\r?\n[ \t]*)*$/i, '')
+    .replace(/\[(?:br|hr)\s*\/?\]/gi, '\n')
+    .replace(/\[\/?(?:url|email|img|b|i|u|s|strike|spoiler|quote|code|raw|size|color|font|align|center|left|right|list|li)(?:\s*=\s*[^\]\r\n]*)?\]/gi, '')
+    .replace(/\[\*\]/g, '')
+    .trim();
+}
+
 export function SummaryReader({ original, translated, onTranslate }: SummaryReaderProps) {
   const [translation, setTranslation] = useState<string | null>(translated);
   const [view, setView] = useState<SummaryView>(translated ? 'chinese' : 'original');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const canTranslate = Boolean(onTranslate && detectSummaryLanguage(original) !== 'zh-CN');
+  const displayedOriginal = summaryDisplayText(original);
+  const displayedTranslation = translation === null ? null : summaryDisplayText(translation);
+  const canTranslate = Boolean(onTranslate && detectSummaryLanguage(displayedOriginal) !== 'zh-CN');
 
   useEffect(() => {
     setTranslation(translated);
@@ -55,18 +67,20 @@ export function SummaryReader({ original, translated, onTranslate }: SummaryRead
         ) : null}
       </div>
 
-      {translation && view !== 'original' && (
-        <div className="summary-reader__text summary-reader__text--translated">
-          {view === 'bilingual' && <span>中文译文</span>}
-          <p>{translation}</p>
-        </div>
-      )}
-      {(!translation || view !== 'chinese') && (
-        <div className="summary-reader__text">
-          {translation && view === 'bilingual' && <span>原文</span>}
-          <p>{original}</p>
-        </div>
-      )}
+      <div className="summary-reader__scroll" role="region" aria-label="简介正文" tabIndex={0}>
+        {translation && view !== 'original' && (
+          <div className="summary-reader__text summary-reader__text--translated">
+            {view === 'bilingual' && <span>中文译文</span>}
+            <p>{displayedTranslation}</p>
+          </div>
+        )}
+        {(!translation || view !== 'chinese') && (
+          <div className="summary-reader__text">
+            {translation && view === 'bilingual' && <span>原文</span>}
+            <p>{displayedOriginal}</p>
+          </div>
+        )}
+      </div>
       {error && <p className="summary-reader__error" role="alert">{error}</p>}
       {!translation && canTranslate && <small>按需使用在线机器翻译，译文会保存在本地。</small>}
     </section>

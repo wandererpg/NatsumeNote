@@ -1,0 +1,15 @@
+.brand-lockup__version {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  color: var(--teal-0);
+  background: color-mix(in srgb, var(--teal-0) 7%, transparent);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.5;
+  vertical-align: 1px;
+  white-space: nowrap;
+}

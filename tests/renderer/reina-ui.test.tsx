@@ -18,6 +18,12 @@ import type {
   ReinaTag,
 } from '../../src/shared/reina';
 
+vi.mock('../../src/renderer/src/features/reina/ReinaPlayChart', () => ({
+  ReinaPlayChart: ({ sessions }: { sessions: ReinaSession[] }) => (
+    <section aria-label="每日游玩时长"><h4>每日游玩时长</h4><output>{sessions.length} 个绘图记录</output></section>
+  ),
+}));
+
 // TagChips selection values are the shared `provider:name` keys.
 function installBridge(api: object): void {
   Object.defineProperty(window, 'galMusic', { configurable: true, value: api });
@@ -341,7 +347,7 @@ describe('ReinaHistoryPreview', () => {
     installBridge({ reinaQuery: vi.fn().mockResolvedValue(envelope(makeStats({ sessionCount: 0, sessionTotalMinutes: 0 }))) });
     render(<ReinaHistoryPreview sourceId={source.id} gameId={42} />);
     expect(await screen.findByText('100 小时')).toBeInTheDocument();
-    expect(screen.getByText(/已保存会话合计 0 分钟/)).toBeInTheDocument();
+    expect(screen.queryByText(/已保存会话合计/)).not.toBeInTheDocument();
   });
 
   it('retries failures and shows missing lifetime totals as unavailable', async () => {
@@ -353,7 +359,7 @@ describe('ReinaHistoryPreview', () => {
     expect(await screen.findByText('数据库暂忙')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '重试预览' }));
     expect(await screen.findByText('来源未提供')).toBeInTheDocument();
-    expect(screen.getByText('来源未提供记录次数')).toBeInTheDocument();
+    expect(screen.queryByText('来源未提供记录次数')).not.toBeInTheDocument();
     expect(screen.queryByText('0 分钟')).not.toBeInTheDocument();
   });
 
@@ -374,6 +380,34 @@ describe('ReinaHistoryPreview', () => {
 });
 
 describe('ReinaGamePanel', () => {
+  it('puts the daily chart and source total before settings and removes session controls and explanatory copy', async () => {
+    const api = makeGameApi({
+      reinaLinks: vi.fn().mockResolvedValue([linkedGame]),
+      reinaQuery: vi.fn().mockImplementation(async (tool: string) => (
+        tool === 'reina_get_stats'
+          ? envelope(makeStats(), { warnings: ['不应展示的来源说明'] })
+          : envelope([makeSession(1), makeSession(2)], { warnings: ['不应展示的会话说明'] })
+      )),
+    });
+    installBridge(api);
+    const { container } = render(<ReinaGamePanel gameId="game-2" gameName="天津罪" />);
+
+    const stats = await screen.findByRole('group', { name: '来源总计' });
+    expect(within(stats).getByText('100 小时')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '每日游玩时长' })).toBeInTheDocument();
+    expect(screen.getByText('2 个绘图记录')).toBeInTheDocument();
+    const play = container.querySelector('.reina-play')!;
+    const sourceSettings = screen.getByRole('region', { name: '数据来源' });
+    const bindingSettings = screen.getByRole('region', { name: '作品关联' });
+    expect(play.compareDocumentPosition(sourceSettings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(play.compareDocumentPosition(bindingSettings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('input[type="date"]')).toBeNull();
+    expect(container.textContent).not.toMatch(/只读读取|来源提示|不应展示|会话累计|会话记录|可能陈旧|时间范围|分钟精度|半开区间|不提供实时计时|来源未保存计时方式/);
+    expect(api.reinaQuery).toHaveBeenCalledWith('reina_list_sessions', {
+      sourceId: source.id, gameId: 77, limit: 100, snapshotId: 'snap-1',
+    });
+  });
+
   it('recognizes a batch-imported link without making the user select it again', async () => {
     const api = makeGameApi();
     installBridge(api);
@@ -381,7 +415,7 @@ describe('ReinaGamePanel', () => {
     expect(await screen.findByText(/数据库已连接，此作品尚未关联/)).toBeInTheDocument();
     api.reinaLinks.mockResolvedValue([linkedGame]);
     act(() => { window.dispatchEvent(new Event('reina-tags-changed')); });
-    expect(await screen.findByRole('group', { name: '游玩统计（两种口径）' })).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: '来源总计' })).toBeInTheDocument();
     expect(api.reinaQuery).toHaveBeenCalledWith('reina_get_stats', expect.objectContaining({ gameId: 77 }));
     expect(api.reinaQuery).toHaveBeenCalledWith('reina_list_sessions', expect.objectContaining({ gameId: 77 }));
   });
@@ -411,12 +445,12 @@ describe('ReinaGamePanel', () => {
     fireEvent.click(await screen.findByRole('radio', { name: /来源中的日文标题/ }));
     const preview = await screen.findByRole('region', { name: '历史时长预览' });
     expect(await within(preview).findByText('100 小时')).toBeInTheDocument();
-    expect(within(preview).getByText(/来源记录 80 次/)).toBeInTheDocument();
+    expect(within(preview).queryByText(/来源记录 80 次/)).not.toBeInTheDocument();
     expect(bind).not.toHaveBeenCalled();
     expect(api.reinaQuery.mock.calls.some(([tool]) => tool === 'reina_list_sessions')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: '关联此作品' }));
     expect(await screen.findByText(/已关联《来源中的日文标题》/)).toBeInTheDocument();
-    const stats = await screen.findByRole('group', { name: '游玩统计（两种口径）' });
+    const stats = await screen.findByRole('group', { name: '来源总计' });
     expect(within(stats).getByText('100 小时')).toBeInTheDocument();
     await waitFor(() => expect(api.reinaQuery).toHaveBeenCalledWith('reina_list_sessions', expect.objectContaining({ gameId: 42 })));
   });

@@ -6,6 +6,7 @@ import './reina.css';
 
 export interface TagChipsProps {
   tags: ReinaTag[];
+  variant?: 'filter' | 'browse';
   /** Stable `provider:name` keys, not bare tag names. */
   selected?: string[];
   onToggle?: (key: string) => void;
@@ -35,7 +36,7 @@ function displayKey(key: string): string {
  * chip: the same text from VNDB and Bangumi must never merge into one filter.
  * Selected values and onToggle arguments are stable `provider:name` keys.
  */
-export function TagChips({ tags, selected, onToggle, onClear }: TagChipsProps) {
+export function TagChips({ tags, selected, onToggle, onClear, variant = 'filter' }: TagChipsProps) {
   const [expanded, setExpanded] = useState(false);
   const [dismissedInvalid, setDismissedInvalid] = useState<string[]>([]);
   const [pendingRemoval, setPendingRemoval] = useState<string[]>([]);
@@ -97,7 +98,7 @@ export function TagChips({ tags, selected, onToggle, onClear }: TagChipsProps) {
 
   return (
     <div className="reina-tags-block">
-      <div className="reina-tags__summary">
+      {variant === 'filter' && <div className="reina-tags__summary">
         <span>
           已选 <strong>{selectedKeys.length}</strong> 个 · 多选为 AND（需同时满足）
         </span>
@@ -109,7 +110,7 @@ export function TagChips({ tags, selected, onToggle, onClear }: TagChipsProps) {
         >
           清空筛选
         </button>
-      </div>
+      </div>}
 
       {noticeKeys.length > 0 && (
         <div className="reina-tags__notice" role="status">
@@ -131,7 +132,7 @@ export function TagChips({ tags, selected, onToggle, onClear }: TagChipsProps) {
         <p className="reina-empty">此作品没有 ReinaManager 标签。</p>
       ) : (
         <>
-          <div className="reina-tags" role="group" aria-label="ReinaManager 标签筛选（多选为 AND）">
+          <div className="reina-tags" role="group" aria-label={variant === 'browse' ? '作品标签' : 'ReinaManager 标签筛选（多选为 AND）'}>
             {shown.map((entry) => {
               const pressed = selectedKeys.includes(entry.key);
               const provenance = providerLabel(entry.provider);
@@ -141,7 +142,7 @@ export function TagChips({ tags, selected, onToggle, onClear }: TagChipsProps) {
                   key={entry.key}
                   type="button"
                   className="reina-tag"
-                  aria-pressed={pressed}
+                  aria-pressed={variant === 'filter' ? pressed : undefined}
                   aria-label={accessibleLabel}
                   title={accessibleLabel}
                   onClick={() => onToggle?.(entry.key)}

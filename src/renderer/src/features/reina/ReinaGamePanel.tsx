@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle,
   ChevronDown,
-  Gamepad2,
-  Info,
   Link2,
   LoaderCircle,
   RefreshCw,
@@ -16,19 +13,9 @@ import { getReinaBridge, hasBridgeMethod, reinaErrorMessage, type ReinaBridge } 
 import { useReinaSources } from './useReinaSources';
 import { useReinaSessions } from './useReinaSessions';
 import { ReinaHistoryPreview } from './ReinaHistoryPreview';
+import { ReinaPlayChart } from './ReinaPlayChart';
 import { asReinaList, mergeGames, mergeWarnings } from './reina-data';
-import {
-  dayStartIso,
-  durationPrecisionLabel,
-  formatDateTime,
-  formatMinutes,
-  formatSessionCount,
-  formatSessionRange,
-  formatSourceDate,
-  nextDayStartIso,
-  providerLabel,
-  trackingModeLabel,
-} from './reina-format';
+import { formatDateTime, formatMinutes, providerLabel } from './reina-format';
 import './reina.css';
 import { notifyReinaTagsChanged, REINA_TAGS_CHANGED_EVENT } from './reina-events';
 
@@ -77,22 +64,6 @@ function emptySearchState(): CandidateSearchState {
   };
 }
 
-function WarningList({ warnings, label = '来源提示' }: { warnings: string[]; label?: string }) {
-  return (
-    <div className="reina-warnings" role="status" aria-label={label}>
-      <p className="reina-warnings__title">
-        <Info size={13} aria-hidden="true" />
-        来源提示
-      </p>
-      <ul>
-        {warnings.map((warning, index) => (
-          <li key={`${index}-${warning}`}>{warning}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 /**
  * Read-only ReinaManager play history for one local game. Association is
  * always explicit: choosing a candidate only selects it, and the user must
@@ -118,8 +89,6 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
   const [candidates, setCandidates] = useState<ReinaGame[] | null>(null);
   const [searchState, setSearchState] = useState<CandidateSearchState>(emptySearchState);
   const [selectedCandidate, setSelectedCandidate] = useState<ReinaGame | null>(null);
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
   const [binding, setBinding] = useState(false);
   const [unbinding, setUnbinding] = useState(false);
   const [unbindArmed, setUnbindArmed] = useState(false);
@@ -200,8 +169,6 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
     setSearchQuery(gameName);
     setSearchMode('name');
     setExternalId('');
-    setFromDate('');
-    setToDate('');
     setUnbindArmed(false);
     setActionError(null);
     setStatusMessage(null);
@@ -276,24 +243,12 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
   const sourceLabel = sources?.find((source) => source.id === sourceId)?.label ?? '';
   const externalGameId = boundLink && !boundLink.needsConfirmation ? boundLink.externalGameId : null;
 
-  const fromIso = fromDate ? dayStartIso(fromDate) : null;
-  const toIso = toDate ? nextDayStartIso(toDate) : null;
-  const rangeError = fromDate && !fromIso
-    ? '开始日期无效。'
-    : toDate && !toIso
-      ? '结束日期无效。'
-      : fromDate && toDate && fromDate > toDate
-        ? '开始日期不能晚于结束日期。'
-        : null;
-  const rangeActive = Boolean(fromDate || toDate) && !rangeError;
-
   const play = useReinaSessions({
     sourceId: sourceId || null,
     gameId: externalGameId,
-    from: fromIso ?? undefined,
-    to: toIso ?? undefined,
-    pageSize: 20,
-    enabled: Boolean(boundLink) && !rangeError && !linksLoading,
+    pageSize: 100,
+    loadAll: true,
+    enabled: Boolean(boundLink) && !linksLoading,
   });
 
   const recommendedCandidateIds = useMemo(() => {
@@ -312,10 +267,6 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
       ...candidates.filter((candidate) => !recommendedCandidateIds.has(candidate.id)),
     ];
   }, [candidates, recommendedCandidateIds]);
-
-  const staleSuffix = play.fetchedAt
-    ? `（读取于 ${formatDateTime(play.fetchedAt) ?? play.fetchedAt}）`
-    : '';
 
   const searchCandidates = async (cursor: string | null = null, browseAll = false, retry = false) => {
     if (searchPendingRef.current) return;
@@ -461,7 +412,7 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
         return;
       }
       setUnbindArmed(false);
-      setStatusMessage(`已解除与《${linkedName}》的关联；ReinaManager 中的记录不会被删除。`);
+      setStatusMessage(`已解除与《${linkedName}》的关联。`);
       await loadLinks();
     } catch (unbindError) {
       if (mountedRef.current && gameIdRef.current === targetGameId) {
@@ -478,16 +429,9 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
     <div className="reina-panel reina-game-panel">
       <header className="reina-panel__header">
         <div>
-          <p className="reina-eyebrow">
-            <Gamepad2 size={13} aria-hidden="true" />
-            REINAMANAGER
-          </p>
           <h2 className="reina-panel__heading" id="reina-game-heading">
             游玩记录
           </h2>
-          <p className="reina-panel__subtitle">
-            只读读取 ReinaManager 中《{gameName}》的已保存游玩时段与累计统计；不会修改来源数据库，也不会删除其中内容。
-          </p>
         </div>
       </header>
 
@@ -497,7 +441,55 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
         </p>
       )}
 
-      <section className="reina-section" aria-labelledby="reina-source-title">
+      {boundLink && !boundLink.needsConfirmation && (
+        <section
+          className="reina-section reina-play"
+          aria-label="游玩时间"
+          aria-busy={play.loading || play.refreshing}
+        >
+          <div className="reina-play__header">
+            <div className="reina-play__total" role="group" aria-label="来源总计">
+              <h3>来源总计</h3>
+              <p className="reina-stat__value">
+                {play.stats ? formatMinutes(play.stats.sourceTotalMinutes) : '—'}
+              </p>
+            </div>
+            <button
+              className="button button--ghost button--small"
+              type="button"
+              onClick={play.refresh}
+              disabled={play.loading || play.refreshing}
+            >
+              <RefreshCw
+                className={play.loading || play.refreshing ? 'spin' : undefined}
+                size={14}
+                aria-hidden="true"
+              />
+              {play.refreshing ? '刷新中…' : '刷新'}
+            </button>
+          </div>
+
+          {play.loading && (
+            <p className="reina-loading" role="status">
+              <LoaderCircle className="spin" size={15} aria-hidden="true" />
+              正在读取游玩时间…
+            </p>
+          )}
+          {play.error && (
+            <div className="reina-error" role="alert">
+              <span>{play.error}</span>
+              <button className="reina-link-button" type="button" onClick={play.refresh}>
+                重试
+              </button>
+            </div>
+          )}
+          {!play.loading && (hasPlayData || !play.error) && (
+            <ReinaPlayChart sessions={play.sessions} />
+          )}
+        </section>
+      )}
+
+      <section className="reina-section reina-game-panel__source" aria-labelledby="reina-source-title">
         <div className="reina-section__heading">
           <h3 id="reina-source-title">数据来源</h3>
           <button
@@ -544,7 +536,7 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
               </select>
             </label>
             {!boundLink && !linksLoading && !linksError && (
-              <p className="reina-hint">数据库已连接，此作品尚未关联。请选择对应的来源作品，确认后即可读取已有历史时长；连接数据库不会自动匹配作品。</p>
+              <p className="reina-hint">数据库已连接，此作品尚未关联。</p>
             )}
           </>
         ) : (
@@ -555,7 +547,7 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
       </section>
 
       {sourceId && (
-        <section className="reina-section" aria-labelledby="reina-binding-title">
+        <section className="reina-section reina-game-panel__binding" aria-labelledby="reina-binding-title">
           <div className="reina-section__heading">
             <h3 id="reina-binding-title">作品关联</h3>
             <span className="reina-chip">{sourceLabel || '未知来源'}</span>
@@ -590,14 +582,11 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
                 <p className="reina-bound__name">
                   已关联《{boundLink.externalName || `Reina 游戏 #${boundLink.externalGameId}`}》
                 </p>
-              {boundLink.needsConfirmation && <p className="reina-notice" role="status">来源数据库已重新选择，旧关联暂不读取。请解除此关联，再搜索并确认对应作品；已有手账卡片保留。</p>}
-                <p className="reina-bound__meta">
-                  ReinaManager 游戏 #{boundLink.externalGameId} · 来源 {sourceLabel || boundLink.sourceId}
-                </p>
+                {boundLink.needsConfirmation && <p className="reina-notice" role="status">请解除旧关联后重新选择作品。</p>}
               </div>
               {unbindArmed ? (
                 <div className="reina-bound__confirm" role="group" aria-label="确认解绑">
-                  <p role="alert">解绑只移除本地关联，不会删除 ReinaManager 中的游戏或会话。</p>
+                  <p role="alert">解除与《{boundLink.externalName}》的关联？</p>
                   <div className="reina-bound__confirm-actions">
                     <button
                       className="button button--danger button--small"
@@ -706,7 +695,6 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
                   </button>
                 </div>
               )}
-              {searchState.warnings.length > 0 && <WarningList warnings={searchState.warnings} />}
 
               {searchState.loaded && searchState.searchedFor && (
                 <p className="reina-hint">
@@ -855,211 +843,6 @@ export function ReinaGamePanel({ gameId, gameName }: ReinaGamePanelProps) {
         </section>
       )}
 
-      {boundLink && !boundLink.needsConfirmation && (
-        <section
-          className="reina-section reina-play"
-          aria-labelledby="reina-play-title"
-          aria-busy={play.loading || play.refreshing || play.loadingMore}
-        >
-          <div className="reina-play__header">
-            <div>
-              <h3 id="reina-play-title">已保存的游玩记录</h3>
-              <p className="reina-play__source">
-                来源 ReinaManager · 上次读取{' '}
-                {play.fetchedAt ? (formatDateTime(play.fetchedAt) ?? '时间未知') : '尚未读取'}
-              </p>
-            </div>
-            <button
-              className="button button--ghost button--small"
-              type="button"
-              onClick={play.refresh}
-              disabled={play.loading || play.refreshing || Boolean(rangeError)}
-            >
-              <RefreshCw
-                className={play.refreshing ? 'spin' : undefined}
-                size={14}
-                aria-hidden="true"
-              />
-              刷新
-            </button>
-          </div>
-
-          <p className="reina-hint">
-            日期按会话开始时间筛选，使用半开区间 [开始, 结束)；跨午夜的记录不会在午夜截断，日期按本机时区转换。
-          </p>
-
-          <div className="reina-range">
-            <label className="reina-field">
-              <span>开始日期</span>
-              <input
-                type="date"
-                value={fromDate}
-                max={toDate || undefined}
-                onChange={(event) => setFromDate(event.target.value)}
-                aria-label="开始日期"
-              />
-            </label>
-            <label className="reina-field">
-              <span>结束日期</span>
-              <input
-                type="date"
-                value={toDate}
-                min={fromDate || undefined}
-                onChange={(event) => setToDate(event.target.value)}
-                aria-label="结束日期"
-              />
-            </label>
-            <button
-              className="reina-link-button"
-              type="button"
-              onClick={() => {
-                setFromDate('');
-                setToDate('');
-              }}
-              disabled={!fromDate && !toDate}
-            >
-              清除时间范围
-            </button>
-          </div>
-
-          {rangeError && (
-            <p className="reina-error" role="alert">
-              <AlertTriangle size={13} aria-hidden="true" /> {rangeError} 未发起读取。
-            </p>
-          )}
-
-          {!rangeError && (
-            <>
-              {play.loading ? (
-                <p className="reina-loading" role="status">
-                  <LoaderCircle className="spin" size={15} aria-hidden="true" />
-                  正在读取 ReinaManager 记录…
-                </p>
-              ) : (
-                <>
-                  {play.stale && play.refreshing && (
-                    <p className="reina-notice" role="status">
-                      正在刷新…当前显示上次读取的结果{staleSuffix}。
-                    </p>
-                  )}
-                  {play.stale && play.error && !play.refreshing && (
-                    <p className="reina-notice reina-notice--warn" role="alert">
-                      读取失败，显示上次结果{staleSuffix}。
-                    </p>
-                  )}
-                  {play.error && !play.stale && !hasPlayData && (
-                    <div className="reina-error" role="alert">
-                      <span>{play.error}</span>
-                      <button className="reina-link-button" type="button" onClick={play.refresh}>
-                        重试
-                      </button>
-                    </div>
-                  )}
-
-                  {play.warnings.length > 0 && <WarningList warnings={play.warnings} />}
-
-                  {play.stats ? (
-                    <div className="reina-stats" role="group" aria-label="游玩统计（两种口径）">
-                      <article className="reina-stat">
-                        <h4>来源总计 · 全生命周期</h4>
-                        <p className="reina-stat__value">
-                          {formatMinutes(play.stats.sourceTotalMinutes)}
-                        </p>
-                        <p className="reina-stat__meta">
-                          {play.stats.sourceSessionCount === null
-                            ? '来源会话数未提供'
-                            : `来源会话数 ${formatSessionCount(play.stats.sourceSessionCount)}`}
-                          ；来源统计的累计分钟，不受当前时间范围影响。
-                        </p>
-                        <p className="reina-stat__meta">
-                          来源保存的最近游玩：
-                          {formatDateTime(play.stats.sourceLastPlayed) ?? '来源未提供'}（可能陈旧，仅供参考）
-                        </p>
-                      </article>
-                      <article className="reina-stat reina-stat--sessions">
-                        <h4>会话累计 · {rangeActive ? '当前时间范围' : '全部已保存会话'}</h4>
-                        <p className="reina-stat__value">{formatMinutes(play.stats.sessionTotalMinutes)}</p>
-                      <p className="reina-stat__meta">会话中最近结束：{formatDateTime(play.stats.sessionLastPlayed) ?? '暂无有效会话'}</p>
-                        <p className="reina-stat__meta">
-                          已保存会话 {formatSessionCount(play.stats.sessionCount)} · 分钟取整求和。
-                        </p>
-                        <p className="reina-stat__meta">与来源总计口径不同，两者不相加。</p>
-                      </article>
-                    </div>
-                  ) : !play.error ? (
-                    <p className="reina-notice">来源统计不可用，仅显示已保存会话列表。</p>
-                  ) : null}
-
-                  <ul className="reina-disclaimers">
-                    <li>时长来自来源保存的分钟取整值（分钟精度），界面不显示秒级「精确」时长。</li>
-                    <li>只包含已保存的会话；进行中的游玩不会显示，也无法得知游戏此刻是否运行（不提供实时计时）。</li>
-                    <li>来源未保存计时方式与会话类型，界面不做推断。</li>
-                  </ul>
-
-                  <div className="reina-sessions-heading">
-                    <h4>会话记录</h4>
-                    <span>
-                      {play.sessions.length > 0 ? `已加载 ${play.sessions.length} 条` : '暂无记录'}
-                      {play.stats && play.stats.sessionCount > play.sessions.length
-                        ? ` · 范围内共 ${formatSessionCount(play.stats.sessionCount)}`
-                        : ''}
-                    </span>
-                  </div>
-
-                  {play.sessions.length === 0 ? (
-                    <p className="reina-empty">此时间范围内没有已保存的会话。来源只保留已保存记录。</p>
-                  ) : (
-                    <ul className="reina-sessions">
-                      {play.sessions.map((session) => (
-                        <li key={session.id} className="reina-session">
-                          <span className="reina-session__time">
-                            {formatSessionRange(session.startTime, session.endTime)}
-                          </span>
-                          <span className="reina-session__duration">
-                            记录 {formatMinutes(session.recordedMinutes)}
-                          </span>
-                          <span className="reina-session__meta">
-                            来源日期 {formatSourceDate(session.sourceDate)} ·{' '}
-                            {trackingModeLabel(session.trackingMode)} ·{' '}
-                            {durationPrecisionLabel(session.durationPrecision)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {play.loadMoreError && (
-                    <div className="reina-error" role="alert">
-                      <span>{play.loadMoreError}</span>
-                      <button className="reina-link-button" type="button" onClick={play.loadMore}>
-                        重试加载更多
-                      </button>
-                    </div>
-                  )}
-                  {play.hasMore && (
-                    <button
-                      className="button button--ghost button--small"
-                      type="button"
-                      onClick={play.loadMore}
-                      disabled={play.loadingMore}
-                    >
-                      {play.loadingMore ? (
-                        <LoaderCircle className="spin" size={14} aria-hidden="true" />
-                      ) : (
-                        <ChevronDown size={14} aria-hidden="true" />
-                      )}
-                      {play.loadingMore ? '正在加载…' : '加载更多会话'}
-                    </button>
-                  )}
-                  {!play.hasMore && play.sessions.length > 0 && (
-                    <p className="reina-hint">已加载全部已保存会话。</p>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </section>
-      )}
     </div>
   );
 }

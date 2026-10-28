@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { ArrowLeft, Plus, Menu, Minus, Search, Settings2, Square, X } from 'lucide-react';
+import { APP_DISPLAY_VERSION, APP_WINDOW_TITLE } from '../../../../shared/version';
+import './title-bar-version.css';
 
 export interface TitleBarProps {
   searchText?: string;
@@ -45,6 +47,10 @@ export function TitleBar({
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    document.title = APP_WINDOW_TITLE;
+  }, []);
+
+  useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'k') return;
       if (document.querySelector('[aria-modal="true"]')) return;
@@ -65,7 +71,7 @@ export function TitleBar({
           <span className="brand-mark__dot" />
         </div>
         <div className="brand-lockup">
-            <span className="brand-lockup__name">NatsumeNote</span>
+          <span className="brand-lockup__name">NatsumeNote <span className="brand-lockup__version" aria-label={`当前版本 ${APP_DISPLAY_VERSION}`}>{APP_DISPLAY_VERSION}</span></span>
           <span className="brand-lockup__hint">游戏记忆珍藏</span>
         </div>
       </div>

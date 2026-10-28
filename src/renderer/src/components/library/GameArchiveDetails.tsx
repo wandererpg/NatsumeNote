@@ -30,7 +30,7 @@ function roleLabel(role: string | null, labels: Record<string, string>, fallback
 
 export function GameArchiveDetails({ source }: GameArchiveDetailsProps) {
   const characters = (source.characters ?? []).slice(0, 6);
-  const staff = (source.staff ?? []).slice(0, 16);
+  const staff = source.staff ?? [];
   if (characters.length === 0 && staff.length === 0) return null;
   const provider = source.source === 'vndb' ? 'VNDB' : 'Bangumi';
 
@@ -69,7 +69,7 @@ export function GameArchiveDetails({ source }: GameArchiveDetailsProps) {
             <div><UsersRound size={14} aria-hidden="true" /><h3 id="game-staff-heading">主创团队</h3></div>
             <span>{provider}</span>
           </header>
-          <ul className="staff-list">
+          <ul className="staff-list" tabIndex={0} aria-label="主创团队名单">
             {staff.map((person, index) => (
               <li key={`${person.externalId}-${person.role}-${index}`}>
                 <a href={person.sourceUrl} target="_blank" rel="noreferrer">

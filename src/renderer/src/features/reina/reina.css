@@ -78,8 +78,7 @@
   gap: 8px 12px;
 }
 
-.reina-section__heading h3,
-.reina-sessions-heading h4 {
+.reina-section__heading h3 {
   margin: 0;
   color: var(--paper-0);
   font-size: 13px;
@@ -640,91 +639,46 @@
 
 /* ---------- game panel: play history ---------- */
 
+.reina-game-panel {
+  min-width: 0;
+}
+
+.reina-game-panel .reina-play {
+  gap: 24px;
+  min-width: 0;
+  padding: 22px 24px 24px;
+  background: color-mix(in srgb, var(--panel-soft) 82%, transparent);
+}
+
 .reina-play__header {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px 14px;
+  gap: 12px 20px;
 }
 
-.reina-play__header h3 {
-  margin: 0;
-  color: var(--paper-0);
-  font-size: 14px;
-  font-weight: 650;
-}
-
-.reina-play__source {
-  margin: 3px 0 0;
-  color: var(--muted-1);
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
-
-.reina-range {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px 14px;
-}
-
-.reina-range .reina-field {
-  flex: 0 1 170px;
-}
-
-.reina-range .reina-link-button {
-  margin-bottom: 8px;
-}
-
-.reina-stats {
+.reina-play__total {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 10px;
-}
-
-.reina-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--ink-1) 55%, transparent);
 }
 
-.reina-stat h4 {
+.reina-play__total h3 {
   margin: 0;
   color: var(--muted-0);
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-}
-
-.reina-stat--sessions {
-  border-color: color-mix(in srgb, var(--teal-0) 26%, transparent);
+  font-size: 13px;
+  font-weight: 550;
 }
 
 .reina-stat__value {
   margin: 0;
   color: var(--paper-0);
-  font-size: 20px;
-  font-weight: 700;
+  font-size: clamp(28px, 3.2vw, 38px);
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
   line-height: 1.2;
-  overflow-wrap: anywhere;
-}
-
-.reina-stat--sessions .reina-stat__value {
-  color: var(--teal-0);
-}
-
-.reina-stat__meta {
-  margin: 0;
-  color: var(--muted-1);
-  font-size: 11px;
-  line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
@@ -742,79 +696,6 @@
   border-color: color-mix(in srgb, var(--pink-0) 26%, transparent);
   color: var(--pink-0);
 }
-
-.reina-disclaimers {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin: 0;
-  padding-left: 18px;
-  color: var(--muted-1);
-  font-size: 11px;
-  line-height: 1.55;
-}
-
-.reina-sessions-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
-}
-
-.reina-sessions-heading span {
-  color: var(--muted-1);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.reina-sessions {
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--ink-1) 45%, transparent);
-  list-style: none;
-  overflow: hidden;
-}
-
-.reina-session {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 2px 14px;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--line);
-}
-
-.reina-session:last-child {
-  border-bottom: 0;
-}
-
-.reina-session__time {
-  color: var(--paper-0);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-
-.reina-session__duration {
-  color: var(--teal-0);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.reina-session__meta {
-  grid-column: 1 / -1;
-  color: var(--muted-1);
-  font-size: 11px;
-  overflow-wrap: anywhere;
-}
-
-/* ---------- tag chips ---------- */
 
 .reina-tags-block {
   display: flex;
@@ -940,25 +821,13 @@
 
 /* Compact widths (960×640 window, narrow settings column). */
 @media (max-width: 720px) {
-  .reina-stats {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .reina-search__fields {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .reina-range .reina-field {
-    flex: 1 1 100%;
-  }
-
-  .reina-session {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
-  }
-
-  .reina-session__duration {
-    white-space: normal;
+  .reina-game-panel .reina-play {
+    gap: 20px;
+    padding: 18px 16px 20px;
   }
 }
 

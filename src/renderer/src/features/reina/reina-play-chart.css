@@ -1,0 +1,62 @@
+.reina-play-chart {
+  min-width: 0;
+  margin: 0;
+}
+
+.reina-play-chart__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+.reina-play-chart__header h4 {
+  margin: 0;
+  color: var(--paper-0);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.reina-play-chart__plot {
+  width: 100%;
+  min-width: 0;
+  height: clamp(220px, 30vh, 300px);
+}
+
+.reina-play-chart__plot .recharts-surface:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--teal-0);
+  outline-offset: 3px;
+}
+
+.reina-play-chart__tooltip {
+  display: grid;
+  gap: 5px;
+  min-width: 126px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  color: var(--muted-0);
+  background: var(--ink-1);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.reina-play-chart__tooltip strong {
+  color: var(--paper-0);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.reina-play-chart__empty {
+  display: grid;
+  min-height: 200px;
+  margin: 0;
+  place-content: center;
+  border-radius: 10px;
+  color: var(--muted-0);
+  background: color-mix(in srgb, var(--panel-soft) 65%, transparent);
+}

@@ -121,6 +121,36 @@ describe('renderer shell', () => {
     expect(screen.queryByTestId(`game-item-${game.id}`)).not.toBeInTheDocument();
   });
 
+  it('opens saved play records as a sibling view and resets the view when selecting another game', async () => {
+    const secondGame = { ...game, id: 'game-2', name: '第二部作品' };
+    mockGalMusic([game, secondGame], [track]);
+    const links = vi.fn().mockResolvedValue([]);
+    Object.assign(window.galMusic, { reinaSources: vi.fn().mockResolvedValue([]), reinaLinks: links });
+    render(<App />);
+
+    fireEvent.click(await screen.findByTestId(`game-item-${game.id}`));
+    expect(screen.queryByRole('heading', { name: '游玩记录', level: 2 })).not.toBeInTheDocument();
+    const records = screen.getByRole('button', { name: '打开游玩记录' });
+    fireEvent.click(records);
+    expect(await screen.findByRole('heading', { name: '游玩记录', level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开游玩记录' })).toHaveAttribute('aria-current', 'page');
+    await waitFor(() => expect(links).toHaveBeenCalledWith(game.id));
+    expect(screen.queryByText(/只读读取/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '打开作品资料' }));
+    expect(screen.queryByRole('heading', { name: '游玩记录', level: 2 })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开作品资料' })).toHaveAttribute('aria-current', 'page');
+
+    fireEvent.click(screen.getAllByRole('button', { name: '返回游戏仓库' })[0]);
+    await screen.findByRole('heading', { name: '游戏仓库' });
+    fireEvent.click(await screen.findByTestId(`game-item-${secondGame.id}`));
+    await screen.findByRole('heading', { name: secondGame.name, level: 1 });
+    expect(screen.getByRole('button', { name: '打开作品资料' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(screen.getByRole('button', { name: '打开游玩记录' }));
+    expect(await screen.findByRole('heading', { name: '游玩记录', level: 2 })).toBeInTheDocument();
+    await waitFor(() => expect(links).toHaveBeenLastCalledWith(secondGame.id));
+  });
+
   it('keeps track column headers while removing helper copy from the library shell', async () => {
     mockGalMusic([game], [track]);
     render(<App />);

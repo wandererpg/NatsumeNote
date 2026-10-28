@@ -2,18 +2,28 @@
 
 NatsumeNote 是一款面向 Windows 的 Galgame 音乐播放器与作品手账。选择游戏目录后，它可以递归扫描普通音频和常见资源包，把音乐复制到独立音乐库，并自动抓取作品资料；每部作品还拥有独立的分页白板，可自由摆放便签、图片、视频、引用和曲目卡。
 
-当前版本：`v_1.1`（内部版本 `1.1.0`） · Windows x64 · Electron
+当前版本：`v_1.2`（内部版本 `1.2.0`） · Windows x64 · Electron
 
 源码仓库：[github.com/wandererpg/NatsumeNote](https://github.com/wandererpg/NatsumeNote)
 
+## v_1.2 更新内容
+
+- 美化手账页面导航、工具栏、属性面板与卡片排版，优化过渡动画、键盘操作和编辑保存。
+- 作品简介随右栏自适应延长，封面保持原有显示方式；人物资料与主创团队上下对齐，超出内容在栏内滚动，标签位于右栏。
+- 游玩记录与作品资料同级，顶部保留来源总计和每日时长折线图，支持悬停与方向键查看，完整读取已保存历史，精简冗长提示。
+
+详见 [完整更新说明](docs/releases/1.2.0.md)。安装版和便携版均为 `1.2.0`，已通过归档、原生组件及隔离界面检查。公开下载状态以 [GitHub Releases](https://github.com/wandererpg/NatsumeNote/releases) 为准。
+
 ## 下载与安装
 
-GitHub Release 建议上传下面两个压缩包和校验文件：
+安装版和便携版压缩包分别用于安装和直接运行，可从 [v_1.2 发布页](https://github.com/wandererpg/NatsumeNote/releases/tag/v_1.2) 下载。校验值见 [SHA256SUMS.txt](docs/releases/1.2.0-SHA256SUMS.txt)。
 
 | 文件 | 用途 |
 | --- | --- |
-| `NatsumeNote-1.1.0-windows-x64-installer.zip` | 安装版。解压后运行 `NatsumeNote-1.1.0-installer/NatsumeNote-1.1.0-x64.exe`，可以选择安装目录，并创建桌面/开始菜单快捷方式。 |
-| `NatsumeNote-1.1.0-windows-x64-portable.zip` | 便携版。解压后直接运行 `NatsumeNote-1.1.0-portable/NatsumeNote.exe`，不会执行安装流程。 |
+| `NatsumeNote-1.2.0-windows-x64-installer.zip` | 安装版。解压后运行 `NatsumeNote-1.2.0-installer/NatsumeNote-1.2.0-x64.exe`，可以选择安装目录，并创建桌面/开始菜单快捷方式。 |
+| `NatsumeNote-1.2.0-windows-x64-portable.zip` | 便携版。解压后直接运行 `NatsumeNote-1.2.0-portable/NatsumeNote.exe`，不会执行安装流程。 |
+
+请完整解压便携版并保留旁边的 `resources`、DLL 和 `locales` 文件；不要只复制一个 EXE。更新前请先关闭旧版，原有作品、音乐和手账数据继续沿用。
 
 ## 功能
 
@@ -76,11 +86,11 @@ GitHub Release 建议上传下面两个压缩包和校验文件：
 产物目录结构如下（便携版还包含其他运行文件）：
 
 ```text
-NatsumeNote-1.1.0-windows-x64-installer.zip
-└─ NatsumeNote-1.1.0-installer/NatsumeNote-1.1.0-x64.exe
+NatsumeNote-1.2.0-windows-x64-installer.zip
+└─ NatsumeNote-1.2.0-installer/NatsumeNote-1.2.0-x64.exe
 
-NatsumeNote-1.1.0-windows-x64-portable.zip
-└─ NatsumeNote-1.1.0-portable/
+NatsumeNote-1.2.0-windows-x64-portable.zip
+└─ NatsumeNote-1.2.0-portable/
    ├─ NatsumeNote.exe
    ├─ locales/
    ├─ *.dll 等运行文件
@@ -111,6 +121,6 @@ NatsumeNote 使用独立远程仓库 `git@github.com:wandererpg/NatsumeNote.git`
 
 1. 将源码、`README.md`、必要的许可证和第三方声明放在仓库根目录。
 2. 不要把 `node_modules`、`out`、旧的 `release-v*` 构建目录或用户音乐库提交到源码仓库。
-3. 创建 GitHub Release，建议使用标签 `v_1.1`。
-4. 在 Release Assets 中上传 `NatsumeNote-1.1.0-windows-x64-installer.zip`、`NatsumeNote-1.1.0-windows-x64-portable.zip` 和 `SHA256SUMS.txt`。
+3. 创建 GitHub Release，建议使用标签 `v_1.2`。
+4. 在 Release Assets 中上传 `NatsumeNote-1.2.0-windows-x64-installer.zip`、`NatsumeNote-1.2.0-windows-x64-portable.zip` 和 `SHA256SUMS.txt`。
 5. 发布前确认 GARbro 和其他随包第三方组件的许可证、版权声明及再分发条件；如需要，请把对应的 `LICENSE`/`NOTICE` 文件一并放入仓库和发布说明。

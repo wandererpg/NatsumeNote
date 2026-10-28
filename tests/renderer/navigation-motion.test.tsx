@@ -12,6 +12,7 @@ vi.mock('animejs', () => ({
   }),
 }));
 import { useNavigationMotion } from '../../src/renderer/src/hooks/useNavigationMotion';
+import { animate } from 'animejs';
 
 const committed = vi.fn();
 function Navigation() {
@@ -34,6 +35,7 @@ describe('interruptible navigation', () => {
     vi.useFakeTimers();
     committed.mockClear();
     animations.length = 0;
+    vi.mocked(animate).mockClear();
     preference = {
       matches: false,
       addEventListener: vi.fn((_event, handler) => { preferenceChanged = handler; }),
@@ -59,6 +61,28 @@ describe('interruptible navigation', () => {
     expect(screen.getByTestId('view')).toHaveTextContent('recent');
     expect(oldView.inert).toBe(false);
     expect(animations[0].revert).toHaveBeenCalled();
+  });
+
+  it('uses a short horizontal transition between game folders', () => {
+    function Folders() {
+      const ref = useRef<HTMLElement>(null);
+      const [view, setView] = useState('library:one:');
+      const navigate = useNavigationMotion(ref, view);
+      return <div className="app-shell" data-input-modality="pointer">
+        <button onClick={() => navigate('library:two:', () => setView('library:two:'))}>Next folder</button>
+        <main ref={ref}><div className="library-view" key={view}>{view}</div></main>
+      </div>;
+    }
+    render(<Folders />);
+    fireEvent.click(screen.getByRole('button', { name: 'Next folder' }));
+    expect(vi.mocked(animate).mock.calls[0][1]).toMatchObject({
+      transform: ['translate(0px, 0px)', 'translateX(-4px)'],
+    });
+    act(() => vi.advanceTimersByTime(70));
+    expect(screen.getByText('library:two:')).toBeInTheDocument();
+    expect(vi.mocked(animate).mock.calls[1][1]).toMatchObject({
+      transform: ['translateX(8px)', 'translate(0px, 0px)'],
+    });
   });
 
   it('cancels an exit when the user chooses the current page again', () => {

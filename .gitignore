@@ -22,6 +22,16 @@ github-release-staging-v*/
 .superpowers/brainstorm/
 .vite/
 artifacts/reina-ui/
+artifacts/journal-ui/
+artifacts/game-overview-ui/
+artifacts/play-chart-ui/
+artifacts/browser-preview-ui/
+artifacts/unpacked-ui/
+.journal-ui-smoke-*/
+.game-overview-smoke-*/
+.play-chart-smoke-*/
+.browser-preview-smoke-*/
+.unpacked-ui-smoke-*/
 coverage/
 *.log
 *.tsbuildinfo
