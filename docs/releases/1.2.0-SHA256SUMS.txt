@@ -1,0 +1,5 @@
+1dc073be93563d1fd78ceee35997968c9380e99faa3380f81998616b3d5cfbda  NatsumeNote-1.2.0-x64.exe
+bd2a0985e711cb74d52af2b55ac3b9594fea0a3bd6b816ad57ac0e09d531ba92  NatsumeNote-1.2.0-x64.exe.blockmap
+50da75b13c739cb0d75d042d6e91f182a9e8bb2a2200982dba4172a7808bcb19  latest.yml
+375620acd05101cb255e0add305c27a9fa8a60c493444b7396e8271ac4c149a2  NatsumeNote-1.2.0-windows-x64-portable.zip
+ba8f9c234d90b0ab44f6b53acdcce78ac96d7cb9b0f967b25a35a87d77af4874  NatsumeNote-1.2.0-windows-x64-installer.zip

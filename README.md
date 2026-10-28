@@ -16,7 +16,7 @@ NatsumeNote 是一款面向 Windows 的 Galgame 音乐播放器与作品手账�
 
 ## 下载与安装
 
-安装版和便携版压缩包分别用于安装和直接运行。校验值见同一发布中的 `SHA256SUMS.txt`。
+安装版和便携版压缩包分别用于安装和直接运行，可从 [v_1.2 发布页](https://github.com/wandererpg/NatsumeNote/releases/tag/v_1.2) 下载。校验值见 [SHA256SUMS.txt](docs/releases/1.2.0-SHA256SUMS.txt)。
 
 | 文件 | 用途 |
 | --- | --- |
